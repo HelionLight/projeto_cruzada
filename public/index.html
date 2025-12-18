@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro - Cruzada</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Formulário de Registro - Cruzada</h1>
+
+    <h2>Informações Pessoais</h2>
+    <form id="registroForm" enctype="multipart/form-data">
+      <label for="nome">Nome:</label>
+      <input type="text" id="nome" name="nome" required>
+
+      <label for="cpf">CPF:</label>
+      <input type="text" id="cpf" name="cpf" required>
+
+      <label for="celular">Celular:</label>
+      <input type="text" id="celular" name="celular" required>
+
+      <label for="email">E-mail:</label>
+      <input type="email" id="email" name="email" required>
+
+      <label for="estado">Estado (residência):</label>
+      <input type="text" id="estado" name="estado" required>
+
+      <label for="cidade">Cidade (residência):</label>
+      <input type="text" id="cidade" name="cidade" required>
+
+      <label for="endereco">Endereço (residência):</label>
+      <input type="text" id="endereco" name="endereco" required>
+
+      <label for="cep">CEP (residência):</label>
+      <input type="text" id="cep" name="cep" required>
+
+      <label for="sexo">Sexo:</label>
+      <select id="sexo" name="sexo" required>
+        <option value="masculino">Masculino</option>
+        <option value="feminino">Feminino</option>
+      </select>
+
+      <label for="dataNascimento">Data de nascimento:</label>
+      <input type="date" id="dataNascimento" name="dataNascimento" required>
+
+      <label for="foto">Foto:</label>
+      <input type="file" id="foto" name="foto" accept="image/*">
+
+      <label for="numeroCruzado">Número de Cruzado (para alteração/exclusão):</label>
+      <input type="text" id="numeroCruzado" name="numeroCruzado">
+
+      <label for="encarnado">Encarnado?</label>
+      <select id="encarnado" name="encarnado" required>
+        <option value="true">Sim</option>
+        <option value="false">Não</option>
+      </select>
+
+      <h2>Informações Profissionais</h2>
+
+      <label for="vinculoProfissional">Vínculo profissional:</label>
+      <select id="vinculoProfissional" name="vinculoProfissional" required>
+        <option value="Marinha">Marinha</option>
+        <option value="Exército">Exército</option>
+        <option value="Força Aérea">Força Aérea</option>
+        <option value="Polícia Militar">Polícia Militar</option>
+        <option value="Corpo de Bombeiros Militar">Corpo de Bombeiros Militar</option>
+        <option value="Civil">Civil</option>
+        <option value="Outros">Outros</option>
+      </select>
+
+      <label for="especificarVinculo">Especificar (se Outros ou militar):</label>
+      <input type="text" id="especificarVinculo" name="especificarVinculo">
+
+      <label for="situacaoProfissional">Situação profissional:</label>
+      <select id="situacaoProfissional" name="situacaoProfissional" required>
+        <option value="Ativa">Ativa</option>
+        <option value="Reserva">Reserva</option>
+        <option value="Reformado">Reformado</option>
+        <option value="Aposentado">Aposentado</option>
+        <option value="Pensionista">Pensionista</option>
+        <option value="Outros">Outros</option>
+      </select>
+
+      <label for="especificarSituacao">Especificar (se Outros):</label>
+      <input type="text" id="especificarSituacao" name="especificarSituacao">
+
+      <label for="formacao">Formação:</label>
+      <select id="formacao" name="formacao" required>
+        <option value="fundamental">Fundamental</option>
+        <option value="medio">Médio</option>
+        <option value="superior">Superior</option>
+        <option value="mestre">Mestre</option>
+        <option value="doutor">Doutor</option>
+      </select>
+
+      <h2>Informações de indicação</h2>
+
+      <label for="nucleoOuGede">Qual núcleo ou GEDE que frequenta?</label>
+      <input type="text" id="nucleoOuGede" name="nucleoOuGede" required>
+
+      <label for="nomeResponsavelIndicacao">Nome do responsável pela indicação:</label>
+      <input type="text" id="nomeResponsavelIndicacao" name="nomeResponsavelIndicacao">
+
+      <label for="cpfResponsavelIndicacao">CPF do responsável pela indicação:</label>
+      <input type="text" id="cpfResponsavelIndicacao" name="cpfResponsavelIndicacao">
+
+      <label for="certificadoIndicacao">Certificado de Indicação (PDF):</label>
+      <input type="file" id="certificadoIndicacao" name="certificadoIndicacao" accept="application/pdf">
+
+      <h2>Contribuição</h2>
+
+      <label for="desejaContribuir">Deseja contribuir financeiramente?</label>
+      <select id="desejaContribuir" name="desejaContribuir" required>
+        <option value="true">Sim</option>
+        <option value="false">Não</option>
+      </select>
+
+      <label for="valorContribuicao">Qual valor da contribuição mensal?</label>
+      <input type="number" id="valorContribuicao" name="valorContribuicao">
+
+      <label for="consignacao">Contribuição consignada em folha?</label>
+      <select id="consignacao" name="consignacao">
+        <option value="true">Sim</option>
+        <option value="false">Não</option>
+      </select>
+
+      <button type="submit">Enviar</button>
+    </form>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

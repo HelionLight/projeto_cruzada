@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Admin - Cruzada</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Painel Administrativo - Cruzada</h1>
+    <div id="loginForm">
+      <h2>Login</h2>
+      <input type="text" id="username" placeholder="Usuário">
+      <input type="password" id="password" placeholder="Senha">
+      <button id="loginBtn">Entrar</button>
+    </div>
+    <div id="adminPanel" style="display: none;">
+      <h2>Registros Pendentes</h2>
+      <div id="pendingList"></div>
+    </div>
+  </div>
+  <script src="admin.js"></script>
+</body>
+</html>
