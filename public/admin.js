@@ -5,6 +5,11 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
 
+  if (!username || !password) {
+    alert('❌ Campos vazios: insira usuário e senha.');
+    return;
+  }
+
   try {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
@@ -19,10 +24,10 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       document.getElementById('adminPanel').style.display = 'block';
       loadPending();
     } else {
-      alert('Erro no login: ' + result.message);
+      alert('❌ Erro no login: ' + (result.message || 'Usuário ou senha incorretos.'));
     }
   } catch (error) {
-    alert('Erro: ' + error.message);
+    alert('❌ Erro de conexão: ' + error.message);
   }
 });
 
@@ -32,21 +37,45 @@ async function loadPending() {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
+    if (!response.ok) {
+      throw new Error('Não foi possível carregar os registros pendentes.');
+    }
+
     const pendentes = await response.json();
-    const list = document.getElementById('pendingList');
-    list.innerHTML = '';
+    const tbody = document.getElementById('pendingTableBody');
+    tbody.innerHTML = '';
+
+    if (pendentes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">✅ Nenhum registro pendente.</td></tr>';
+      return;
+    }
 
     pendentes.forEach(cruzado => {
-      const div = document.createElement('div');
-      div.innerHTML = `
-        <p><strong>${cruzado.nome}</strong> - ${cruzado.email}</p>
-        <button onclick="approve('${cruzado._id}')">Aprovar</button>
-        <button onclick="reject('${cruzado._id}')">Rejeitar</button>
+      const row = document.createElement('tr');
+      
+      // Construir URL da foto
+      const fotoUrl = cruzado.foto ? `/api/cruzados/image/${cruzado.foto}` : null;
+      const certificadoUrl = cruzado.certificadoIndicacao ? `/api/cruzados/image/${cruzado.certificadoIndicacao}` : null;
+      
+      row.innerHTML = `
+        <td>${cruzado.nome}</td>
+        <td>${cruzado.email}</td>
+        <td>${cruzado.cpf}</td>
+        <td>
+          ${fotoUrl ? `<a href="${fotoUrl}" target="_blank"><button class="btnView">Ver Foto</button></a>` : 'Sem foto'}
+        </td>
+        <td>
+          ${certificadoUrl ? `<a href="${certificadoUrl}" target="_blank"><button class="btnView">Ver PDF</button></a>` : 'Sem PDF'}
+        </td>
+        <td>
+          <button class="btnApprove" onclick="approve('${cruzado._id}')">Aprovar</button>
+          <button class="btnReject" onclick="reject('${cruzado._id}')">Rejeitar</button>
+        </td>
       `;
-      list.appendChild(div);
+      tbody.appendChild(row);
     });
   } catch (error) {
-    alert('Erro ao carregar pendentes: ' + error.message);
+    alert('❌ Erro ao carregar pendentes: ' + error.message);
   }
 }
 
@@ -70,12 +99,14 @@ async function updateStatus(id, status) {
     });
 
     if (response.ok) {
-      alert('Status atualizado!');
+      const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
+      alert(`✅ Registro ${statusText} com sucesso!`);
       loadPending();
     } else {
-      alert('Erro ao atualizar status');
+      const error = await response.json();
+      alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));
     }
   } catch (error) {
-    alert('Erro: ' + error.message);
+    alert('❌ Erro de conexão: ' + error.message);
   }
 }

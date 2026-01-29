@@ -59,3 +59,82 @@ button:hover {
   text-align: center;
   color: red;
 }
+
+/* Estilos para Tabela Admin */
+.pendingTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pendingTable thead {
+  background-color: #2c3e50;
+  color: white;
+}
+
+.pendingTable th {
+  padding: 12px;
+  text-align: left;
+  font-weight: bold;
+  border-bottom: 2px solid #2c3e50;
+}
+
+.pendingTable td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+}
+
+.pendingTable tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.btnView {
+  padding: 6px 12px;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin: 2px;
+}
+
+.btnView:hover {
+  background-color: #2980b9;
+}
+
+.btnApprove {
+  padding: 6px 12px;
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin: 2px;
+}
+
+.btnApprove:hover {
+  background-color: #229954;
+}
+
+.btnReject {
+  padding: 6px 12px;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin: 2px;
+}
+
+.btnReject:hover {
+  background-color: #c0392b;
+}
+
+.pendingTable a {
+  text-decoration: none;
+}

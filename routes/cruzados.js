@@ -68,7 +68,22 @@ const cruzadoSchema = Joi.object({
 router.post('/register', upload, async (req, res) => {
   try {
     const { error } = cruzadoSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
+    if (error) {
+      const field = error.details[0].context.label || error.details[0].path[0];
+      return res.status(400).json({ message: `Campo inválido: ${field}. ${error.details[0].message}` });
+    }
+
+    // Verificar CPF duplicado
+    const cpfExistente = await CruzadoTemp.findOne({ cpf: req.body.cpf });
+    if (cpfExistente) {
+      return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
+    }
+
+    // Verificar email duplicado
+    const emailExistente = await CruzadoTemp.findOne({ email: req.body.email });
+    if (emailExistente) {
+      return res.status(400).json({ message: 'Email já cadastrado no sistema!' });
+    }
 
     let fotoId = null;
     let certificadoId = null;
@@ -108,7 +123,24 @@ router.post('/register', upload, async (req, res) => {
     res.status(201).json({ message: 'Registro enviado para aprovação' });
   } catch (err) {
     console.error('Erro ao registrar:', err);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    
+    // Tratamento de erros específicos do MongoDB
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      if (field === 'cpf') {
+        return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
+      } else if (field === 'email') {
+        return res.status(400).json({ message: 'Email já cadastrado no sistema!' });
+      }
+      return res.status(400).json({ message: `${field} já existe no sistema!` });
+    }
+    
+    if (err.name === 'ValidationError') {
+      const messages = Object.keys(err.errors).map(key => `${key}: ${err.errors[key].message}`).join('; ');
+      return res.status(400).json({ message: `Erro de validação: ${messages}` });
+    }
+
+    res.status(500).json({ message: 'Erro ao processar registro. Tente novamente.' });
   }
 });
 
@@ -126,9 +158,14 @@ router.get('/pending', authenticate, authorize('admin', 'secretario'), async (re
 // Aprovar/rejeitar
 router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async (req, res) => {
   const { status } = req.body; // 'aprovado' ou 'rejeitado'
+  
+  if (!status || !['aprovado', 'rejeitado'].includes(status)) {
+    return res.status(400).json({ message: 'Status inválido! Use "aprovado" ou "rejeitado".' });
+  }
+
   try {
     const tempCruzado = await CruzadoTemp.findById(req.params.id);
-    if (!tempCruzado) return res.status(404).json({ message: 'Registro não encontrado' });
+    if (!tempCruzado) return res.status(404).json({ message: 'Registro não encontrado!' });
 
     if (status === 'aprovado') {
       // Mover para coleção permanente
@@ -140,55 +177,78 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
       await permanentCruzado.save();
       // Remover da temporária
       await CruzadoTemp.findByIdAndDelete(req.params.id);
+      res.json({ message: 'Registro aprovado e movido para banco permanente!' });
     } else if (status === 'rejeitado') {
       // Apenas marcar como rejeitado na temporária (será deletado pelo TTL)
       await CruzadoTemp.findByIdAndUpdate(req.params.id, { status: 'rejeitado', updatedAt: Date.now() });
+      res.json({ message: 'Registro rejeitado com sucesso!' });
     }
-    res.json({ message: 'Status atualizado' });
   } catch (err) {
     console.error('Erro ao atualizar status:', err);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Não foi possível aprovar: CPF ou Email já existe no banco permanente!' });
+    }
+    res.status(500).json({ message: 'Erro ao atualizar status. Tente novamente.' });
   }
 });
 
 // Atualizar registro (se numeroCruzado fornecido)
 router.put('/:numeroCruzado', authenticate, authorize('admin'), async (req, res) => {
   try {
+    if (!req.params.numeroCruzado) {
+      return res.status(400).json({ message: 'Número do Cruzado é obrigatório!' });
+    }
+
     const cruzado = await Cruzado.findOneAndUpdate({ numeroCruzado: req.params.numeroCruzado }, req.body, { new: true });
-    if (!cruzado) return res.status(404).json({ message: 'Registro não encontrado' });
+    if (!cruzado) return res.status(404).json({ message: 'Registro com número ' + req.params.numeroCruzado + ' não encontrado!' });
     res.json(cruzado);
   } catch (err) {
     console.error('Erro ao atualizar registro:', err);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({ message: `${field} já existe no sistema!` });
+    }
+    res.status(500).json({ message: 'Erro ao atualizar registro. Tente novamente.' });
   }
 });
 
 // Excluir registro
 router.delete('/:numeroCruzado', authenticate, authorize('admin'), async (req, res) => {
   try {
-    await Cruzado.findOneAndDelete({ numeroCruzado: req.params.numeroCruzado });
-    res.json({ message: 'Registro excluído' });
+    if (!req.params.numeroCruzado) {
+      return res.status(400).json({ message: 'Número do Cruzado é obrigatório!' });
+    }
+
+    const deletado = await Cruzado.findOneAndDelete({ numeroCruzado: req.params.numeroCruzado });
+    if (!deletado) {
+      return res.status(404).json({ message: 'Registro com número ' + req.params.numeroCruzado + ' não encontrado!' });
+    }
+    res.json({ message: 'Registro excluído com sucesso!' });
   } catch (err) {
     console.error('Erro ao excluir registro:', err);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    res.status(500).json({ message: 'Erro ao excluir registro. Tente novamente.' });
   }
 });
 
 // Servir imagem do GridFS
 router.get('/image/:id', async (req, res) => {
   try {
+    if (!req.params.id || req.params.id.length !== 24) {
+      return res.status(400).json({ message: 'ID de arquivo inválido!' });
+    }
+
     const bucket = getGridFSBucket();
     const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(req.params.id));
 
     downloadStream.on('error', (err) => {
-      console.error('Erro ao baixar imagem:', err);
-      res.status(404).json({ message: 'Imagem não encontrada' });
+      console.error('Erro ao baixar arquivo:', err);
+      res.status(404).json({ message: 'Arquivo não encontrado!' });
     });
 
     downloadStream.pipe(res);
   } catch (err) {
-    console.error('Erro ao servir imagem:', err);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    console.error('Erro ao servir arquivo:', err);
+    res.status(500).json({ message: 'Erro ao recuperar arquivo. Tente novamente.' });
   }
 });
 
