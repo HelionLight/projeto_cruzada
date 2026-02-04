@@ -281,7 +281,7 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
       return cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     };
 
-    // Preparar dados para exportação
+    // Preparar dados para exportação (removido 'Status' e adicionadas colunas solicitadas)
     const dadosExportacao = cruzados.map((cruzado, index) => ({
       '#': index + 1,
       'Nome': cruzado.nome,
@@ -289,26 +289,38 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
       'Email': cruzado.email,
       'Celular': cruzado.celular,
       'Idade': calcularIdade(cruzado.dataNascimento),
-      'Vínculo Profissional': cruzado.vinculoProfissional,
-      'Núcleo/GEDE': cruzado.nucleoOuGede,
-      'Status': 'APROVADO'
+      'Sexo': cruzado.sexo || '',
+      'Estado': cruzado.estado || '',
+      'Número Cruzado': cruzado.numeroCruzado || '',
+      'Encarnado': cruzado.encarnado ? 'Sim' : 'Não',
+      'Contribui': cruzado.desejaContribuir ? 'Sim' : 'Não',
+      'Valor Contribuição': cruzado.valorContribuicao != null ? cruzado.valorContribuicao : '',
+      'Consignado': cruzado.consignacao ? 'Sim' : 'Não',
+      'Vínculo Profissional': cruzado.vinculoProfissional || '',
+      'Núcleo/GEDE': cruzado.nucleoOuGede || ''
     }));
 
     // Criar workbook
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(dadosExportacao);
 
-    // Definir largura das colunas
+    // Definir largura das colunas (ajustado para novas colunas)
     const colWidths = [
       { wch: 5 },   // #
-      { wch: 25 },  // Nome
+      { wch: 30 },  // Nome
       { wch: 15 },  // CPF
-      { wch: 25 },  // Email
-      { wch: 15 },  // Celular
+      { wch: 30 },  // Email
+      { wch: 16 },  // Celular
       { wch: 8 },   // Idade
+      { wch: 10 },  // Sexo
+      { wch: 8 },   // Estado
+      { wch: 15 },  // Número Cruzado
+      { wch: 10 },  // Encarnado
+      { wch: 14 },  // Deseja Contribuir
+      { wch: 18 },  // Valor Contribuição
+      { wch: 12 },  // Consignação
       { wch: 25 },  // Vínculo Profissional
-      { wch: 20 },  // Núcleo/GEDE
-      { wch: 12 }   // Status
+      { wch: 20 }   // Núcleo/GEDE
     ];
     worksheet['!cols'] = colWidths;
 
