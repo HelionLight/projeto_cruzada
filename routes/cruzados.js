@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const mongoose = require('mongoose');
+const XLSX = require('xlsx');
 const Cruzado = require('../models/Cruzado');
 const CruzadoTemp = require('../models/CruzadoTemp');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -249,6 +250,204 @@ router.get('/image/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao servir arquivo:', err);
     res.status(500).json({ message: 'Erro ao recuperar arquivo. Tente novamente.' });
+  }
+});
+
+// Exportar para Excel
+router.get('/export/excel', authenticate, authorize('admin', 'secretario'), async (req, res) => {
+  try {
+    // Buscar todos os Cruzados aprovados
+    const cruzados = await Cruzado.find({ status: 'aprovado' }).sort({ createdAt: -1 });
+
+    if (cruzados.length === 0) {
+      return res.status(400).json({ message: 'Nenhum registro aprovado para exportar!' });
+    }
+
+    // Calcular idade a partir da data de nascimento
+    const calcularIdade = (dataNascimento) => {
+      const hoje = new Date();
+      const nascimento = new Date(dataNascimento);
+      let idade = hoje.getFullYear() - nascimento.getFullYear();
+      const mes = hoje.getMonth() - nascimento.getMonth();
+      if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+        idade--;
+      }
+      return idade;
+    };
+
+    // Formatar CPF
+    const formatarCPF = (cpf) => {
+      const cpfLimpo = cpf.replace(/\D/g, '');
+      return cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    };
+
+    // Preparar dados para exportação
+    const dadosExportacao = cruzados.map((cruzado, index) => ({
+      '#': index + 1,
+      'Nome': cruzado.nome,
+      'CPF': formatarCPF(cruzado.cpf),
+      'Email': cruzado.email,
+      'Celular': cruzado.celular,
+      'Idade': calcularIdade(cruzado.dataNascimento),
+      'Vínculo Profissional': cruzado.vinculoProfissional,
+      'Núcleo/GEDE': cruzado.nucleoOuGede,
+      'Status': 'APROVADO'
+    }));
+
+    // Criar workbook
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(dadosExportacao);
+
+    // Definir largura das colunas
+    const colWidths = [
+      { wch: 5 },   // #
+      { wch: 25 },  // Nome
+      { wch: 15 },  // CPF
+      { wch: 25 },  // Email
+      { wch: 15 },  // Celular
+      { wch: 8 },   // Idade
+      { wch: 25 },  // Vínculo Profissional
+      { wch: 20 },  // Núcleo/GEDE
+      { wch: 12 }   // Status
+    ];
+    worksheet['!cols'] = colWidths;
+
+    // Estilizar cabeçalho
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const address = XLSX.utils.encode_col(C) + '1';
+      if (!worksheet[address]) continue;
+      worksheet[address].s = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: '366092' } },
+        alignment: { horizontal: 'center', vertical: 'center' }
+      };
+    }
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Cruzados Aprovados');
+
+    // Gerar arquivo
+    const fileName = `Cruzados_Aprovados_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+    res.send(buffer);
+  } catch (err) {
+    console.error('Erro ao exportar para Excel:', err);
+    res.status(500).json({ message: 'Erro ao gerar arquivo Excel. Tente novamente.' });
+  }
+});
+
+// Buscar Cruzado por CPF (para edição)
+router.get('/buscar', async (req, res) => {
+  try {
+    const cpf = req.query.cpf;
+    
+    if (!cpf || cpf.length !== 11) {
+      return res.status(400).json({ message: 'CPF inválido!' });
+    }
+
+    // Buscar em Cruzado (aprovados) primeiro
+    let cruzado = await Cruzado.findOne({ cpf });
+    
+    if (!cruzado) {
+      return res.status(404).json({ message: 'Cadastro não encontrado!' });
+    }
+
+    res.json(cruzado);
+  } catch (err) {
+    console.error('Erro ao buscar Cruzado:', err);
+    res.status(500).json({ message: 'Erro ao buscar cadastro. Tente novamente.' });
+  }
+});
+
+// Atualizar Cruzado por ID (para edição do usuário)
+router.put('/atualizar/:id', upload, async (req, res) => {
+  try {
+    const cruzadoId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(cruzadoId)) {
+      return res.status(400).json({ message: 'ID inválido!' });
+    }
+
+    // Validar dados
+    const { error } = cruzadoSchema.validate(req.body);
+    if (error) {
+      const field = error.details[0].context.label || error.details[0].path[0];
+      return res.status(400).json({ message: `Campo inválido: ${field}. ${error.details[0].message}` });
+    }
+
+    // Buscar Cruzado existente
+    const cruzadoExistente = await Cruzado.findById(cruzadoId);
+    if (!cruzadoExistente) {
+      return res.status(404).json({ message: 'Cadastro não encontrado!' });
+    }
+
+    // Verificar se novo CPF já existe (se foi alterado)
+    if (req.body.cpf !== cruzadoExistente.cpf) {
+      const cpfJaExiste = await Cruzado.findOne({ cpf: req.body.cpf });
+      if (cpfJaExiste) {
+        return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
+      }
+    }
+
+    // Verificar se novo email já existe (se foi alterado)
+    if (req.body.email !== cruzadoExistente.email) {
+      const emailJaExiste = await Cruzado.findOne({ email: req.body.email });
+      if (emailJaExiste) {
+        return res.status(400).json({ message: 'Email já cadastrado no sistema!' });
+      }
+    }
+
+    // Processar novos arquivos se enviados
+    let novaFotoId = cruzadoExistente.foto;
+    let novocertificadoId = cruzadoExistente.certificadoIndicacao;
+
+    if (req.files && req.files.foto && req.files.foto[0]) {
+      const bucket = getGridFSBucket();
+      const uploadStream = bucket.openUploadStream(req.files.foto[0].originalname, {
+        contentType: req.files.foto[0].mimetype
+      });
+      uploadStream.end(req.files.foto[0].buffer);
+      novaFotoId = uploadStream.id;
+    }
+
+    if (req.files && req.files.certificadoIndicacao && req.files.certificadoIndicacao[0]) {
+      const bucket = getGridFSBucket();
+      const uploadStream = bucket.openUploadStream(req.files.certificadoIndicacao[0].originalname, {
+        contentType: req.files.certificadoIndicacao[0].mimetype
+      });
+      uploadStream.end(req.files.certificadoIndicacao[0].buffer);
+      novocertificadoId = uploadStream.id;
+    }
+
+    // Preparar dados para atualização
+    const dadosAtualizacao = {
+      ...req.body,
+      foto: novaFotoId,
+      certificadoIndicacao: novocertificadoId,
+      updatedAt: Date.now()
+    };
+
+    // Atualizar Cruzado
+    const cruzadoAtualizado = await Cruzado.findByIdAndUpdate(cruzadoId, dadosAtualizacao, { new: true });
+
+    res.json({ message: 'Cadastro atualizado com sucesso!', cruzado: cruzadoAtualizado });
+  } catch (err) {
+    console.error('Erro ao atualizar Cruzado:', err);
+    
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      if (field === 'cpf') {
+        return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
+      } else if (field === 'email') {
+        return res.status(400).json({ message: 'Email já cadastrado no sistema!' });
+      }
+      return res.status(400).json({ message: `${field} já existe no sistema!` });
+    }
+
+    res.status(500).json({ message: 'Erro ao atualizar cadastro. Tente novamente.' });
   }
 });
 

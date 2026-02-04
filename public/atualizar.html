@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atualizar Cadastro - Cruzada</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Atualizar Cadastro - Cruzada</h1>
+    
+    <div id="buscaForm">
+      <h2>Verificação de Identidade</h2>
+      <p>Para atualizar seu cadastro, insira seu CPF e Data de Nascimento para verificação:</p>
+      
+      <label for="cpfBusca">CPF:</label>
+      <input type="text" id="cpfBusca" placeholder="000.000.000-00" required>
+      
+      <label for="dataNascimentoBusca">Data de Nascimento:</label>
+      <input type="date" id="dataNascimentoBusca" required>
+      
+      <button id="buscarBtn">Buscar Cadastro</button>
+      <p style="margin-top: 20px; text-align: center;">
+        <a href="index.html" style="color: #3498db; text-decoration: none;">← Voltar para Novo Cadastro</a>
+      </p>
+    </div>
+
+    <div id="edicaoForm" style="display: none;">
+      <form id="formAtualizacao" enctype="multipart/form-data">
+        <h2>Informações Pessoais</h2>
+        <label for="nome">Nome:</label>
+        <input type="text" id="nome" name="nome" required>
+
+        <label for="cpf">CPF:</label>
+        <input type="text" id="cpf" name="cpf" disabled style="background-color: #f0f0f0; cursor: not-allowed;">
+
+        <label for="celular">Celular:</label>
+        <input type="text" id="celular" name="celular" required>
+
+        <label for="email">E-mail:</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="estado">Estado (residência):</label>
+        <select id="estado" name="estado" required>
+          <option value="">-- Selecione um Estado --</option>
+          <option value="AC">Acre (AC)</option>
+          <option value="AL">Alagoas (AL)</option>
+          <option value="AP">Amapá (AP)</option>
+          <option value="AM">Amazonas (AM)</option>
+          <option value="BA">Bahia (BA)</option>
+          <option value="CE">Ceará (CE)</option>
+          <option value="DF">Distrito Federal (DF)</option>
+          <option value="ES">Espírito Santo (ES)</option>
+          <option value="GO">Goiás (GO)</option>
+          <option value="MA">Maranhão (MA)</option>
+          <option value="MT">Mato Grosso (MT)</option>
+          <option value="MS">Mato Grosso do Sul (MS)</option>
+          <option value="MG">Minas Gerais (MG)</option>
+          <option value="PA">Pará (PA)</option>
+          <option value="PB">Paraíba (PB)</option>
+          <option value="PR">Paraná (PR)</option>
+          <option value="PE">Pernambuco (PE)</option>
+          <option value="PI">Piauí (PI)</option>
+          <option value="RJ">Rio de Janeiro (RJ)</option>
+          <option value="RN">Rio Grande do Norte (RN)</option>
+          <option value="RS">Rio Grande do Sul (RS)</option>
+          <option value="RO">Rondônia (RO)</option>
+          <option value="RR">Roraima (RR)</option>
+          <option value="SC">Santa Catarina (SC)</option>
+          <option value="SP">São Paulo (SP)</option>
+          <option value="SE">Sergipe (SE)</option>
+          <option value="TO">Tocantins (TO)</option>
+        </select>
+
+        <label for="cidade">Cidade (residência):</label>
+        <input type="text" id="cidade" name="cidade" required>
+
+        <label for="endereco">Endereço (residência):</label>
+        <input type="text" id="endereco" name="endereco" required>
+
+        <label for="cep">CEP (residência):</label>
+        <input type="text" id="cep" name="cep" required>
+
+        <label for="sexo">Sexo:</label>
+        <select id="sexo" name="sexo" required>
+          <option value="masculino">Masculino</option>
+          <option value="feminino">Feminino</option>
+        </select>
+
+        <label for="dataNascimento">Data de nascimento:</label>
+        <input type="date" id="dataNascimento" name="dataNascimento" disabled style="background-color: #f0f0f0; cursor: not-allowed;">
+
+        <label for="foto">Foto:</label>
+        <input type="file" id="foto" name="foto" accept="image/*">
+        <small id="fotoInfo" style="color: #666;"></small>
+
+        <label for="encarnado">Encarnado?</label>
+        <select id="encarnado" name="encarnado" required>
+          <option value="true">Sim</option>
+          <option value="false">Não</option>
+        </select>
+
+        <h2>Informações Profissionais</h2>
+
+        <label for="vinculoProfissional">Vínculo profissional:</label>
+        <select id="vinculoProfissional" name="vinculoProfissional" required>
+          <option value="Marinha">Marinha</option>
+          <option value="Exército">Exército</option>
+          <option value="Força Aérea">Força Aérea</option>
+          <option value="Polícia Militar">Polícia Militar</option>
+          <option value="Corpo de Bombeiros Militar">Corpo de Bombeiros Militar</option>
+          <option value="Civil">Civil</option>
+          <option value="Outros">Outros</option>
+        </select>
+
+        <div id="especificarVinculoContainer" style="display: none;">
+          <label for="especificarVinculo">Especificar (se Outros ou militar):</label>
+          <input type="text" id="especificarVinculo" name="especificarVinculo">
+        </div>
+
+        <label for="situacaoProfissional">Situação profissional:</label>
+        <select id="situacaoProfissional" name="situacaoProfissional" required>
+          <option value="Ativa">Ativa</option>
+          <option value="Reserva">Reserva</option>
+          <option value="Reformado">Reformado</option>
+          <option value="Aposentado">Aposentado</option>
+          <option value="Pensionista">Pensionista</option>
+          <option value="Outros">Outros</option>
+        </select>
+
+        <div id="especificarSituacaoContainer" style="display: none;">
+          <label for="especificarSituacao">Especificar (se Outros):</label>
+          <input type="text" id="especificarSituacao" name="especificarSituacao">
+        </div>
+
+        <label for="formacao">Formação:</label>
+        <select id="formacao" name="formacao" required>
+          <option value="fundamental">Fundamental</option>
+          <option value="medio">Médio</option>
+          <option value="superior">Superior</option>
+          <option value="mestre">Mestre</option>
+          <option value="doutor">Doutor</option>
+        </select>
+
+        <h2>Informações de Indicação</h2>
+
+        <label for="nucleoOuGede">Qual núcleo ou GEDE que frequenta?</label>
+        <input type="text" id="nucleoOuGede" name="nucleoOuGede" required>
+
+        <label for="nomeResponsavelIndicacao">Nome do responsável pela indicação:</label>
+        <input type="text" id="nomeResponsavelIndicacao" name="nomeResponsavelIndicacao">
+
+        <label for="cpfResponsavelIndicacao">CPF do responsável pela indicação:</label>
+        <input type="text" id="cpfResponsavelIndicacao" name="cpfResponsavelIndicacao">
+
+        <label for="certificadoIndicacao">Certificado de Indicação (PDF):</label>
+        <input type="file" id="certificadoIndicacao" name="certificadoIndicacao" accept="application/pdf">
+        <small id="certificadoInfo" style="color: #666;"></small>
+
+        <h2>Contribuição</h2>
+
+        <label for="desejaContribuir">Deseja contribuir financeiramente?</label>
+        <select id="desejaContribuir" name="desejaContribuir" required>
+          <option value="false">Não</option>
+          <option value="true">Sim</option>
+        </select>
+
+        <div id="contribuicaoContainer" style="display: none;">
+          <label for="valorContribuicao">Qual valor da contribuição mensal?</label>
+          <input type="number" id="valorContribuicao" name="valorContribuicao">
+
+          <label for="consignacao">Contribuição consignada em folha?</label>
+          <select id="consignacao" name="consignacao">
+            <option value="false">Não</option>
+            <option value="true">Sim</option>
+          </select>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="submit" class="btnSalvar">💾 Salvar Alterações</button>
+          <button type="button" id="cancelarBtn" class="btnCancelar">❌ Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="editar.js"></script>
+</body>
+</html>

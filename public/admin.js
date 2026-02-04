@@ -1,6 +1,14 @@
 // Painel Admin
 let token = '';
 
+// Event listener para botão de exportação
+document.addEventListener('DOMContentLoaded', () => {
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportarExcel);
+  }
+});
+
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
@@ -108,5 +116,35 @@ async function updateStatus(id, status) {
     }
   } catch (error) {
     alert('❌ Erro de conexão: ' + error.message);
+  }
+}
+
+// Função para exportar para Excel
+async function exportarExcel() {
+  try {
+    const response = await fetch('/api/cruzados/export/excel', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      alert('❌ Erro ao exportar: ' + (error.message || 'Tente novamente.'));
+      return;
+    }
+
+    // Obter o blob e fazer download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Cruzados_Aprovados_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    alert('✅ Excel exportado com sucesso!');
+  } catch (error) {
+    alert('❌ Erro ao exportar: ' + error.message);
   }
 }
