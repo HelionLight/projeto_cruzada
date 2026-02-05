@@ -193,7 +193,13 @@ function preencherFormulario(cruzado) {
   document.getElementById('especificarSituacao').value = cruzado.especificarSituacao || '';
   document.getElementById('formacao').value = cruzado.formacao || '';
   document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
-  // Campos do responsável removidos conforme solicitado
+  // Campos do responsável preenchidos como hidden (não aparecem na interface)
+  document.getElementById('nomeResponsavelIndicacao').value = cruzado.nomeResponsavelIndicacao || '';
+  document.getElementById('cpfResponsavelIndicacao').value = cruzado.cpfResponsavelIndicacao || '';
+  // Campo certificadoIndicacao preenchido como hidden
+  if (cruzado.certificadoIndicacao) {
+    document.getElementById('certificadoIndicacao').value = cruzado.certificadoIndicacao;
+  }
   document.getElementById('desejaContribuir').value = cruzado.desejaContribuir ? 'true' : 'false';
   document.getElementById('valorContribuicao').value = cruzado.valorContribuicao || '';
   document.getElementById('consignacao').value = cruzado.consignacao ? 'true' : 'false';

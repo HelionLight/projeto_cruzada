@@ -33,7 +33,7 @@
         <input type="text" id="nome" name="nome" required>
 
         <label for="cpf">CPF:</label>
-        <input type="text" id="cpf" name="cpf" required>
+        <input type="text" id="cpf" name="cpf" disabled style="background-color: #f0f0f0; cursor: not-allowed;">
 
         <label for="celular">Celular:</label>
         <input type="text" id="celular" name="celular" required>
@@ -89,7 +89,7 @@
         </select>
 
         <label for="dataNascimento">Data de nascimento:</label>
-        <input type="date" id="dataNascimento" name="dataNascimento" required>
+        <input type="date" id="dataNascimento" name="dataNascimento" disabled style="background-color: #f0f0f0; cursor: not-allowed;">
 
         <label for="foto">Foto:</label>
         <input type="file" id="foto" name="foto" accept="image/*">
@@ -148,7 +148,11 @@
         <label for="nucleoOuGede">Qual núcleo ou GEDE que frequenta?</label>
         <input type="text" id="nucleoOuGede" name="nucleoOuGede" required>
 
-        <!-- Campo de certificado removido conforme solicitado -->
+        <!-- Campos do responsável removidos da interface mas mantidos como hidden para validação do backend -->
+        <input type="hidden" id="nomeResponsavelIndicacao" name="nomeResponsavelIndicacao">
+        <input type="hidden" id="cpfResponsavelIndicacao" name="cpfResponsavelIndicacao">
+
+        <input type="hidden" id="certificadoIndicacao" name="certificadoIndicacao" accept="application/pdf">
 
         <h2>Contribuição</h2>
 
