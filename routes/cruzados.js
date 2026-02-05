@@ -382,9 +382,25 @@ router.get('/buscar', async (req, res) => {
       return res.status(400).json({ message: 'CPF inválido!' });
     }
 
-    // Buscar em Cruzado (aprovados) primeiro
-    let cruzado = await Cruzado.findOne({ cpf });
-    
+    // Normalizar CPF da query (somente dígitos)
+    const cpfLimpo = cpf.replace(/\D/g, '');
+
+    // Tentar buscar normalizando também o CPF armazenado (remove caracteres não numéricos)
+    // Utiliza $expr + $regexReplace para igualar mesmo que o CPF no banco esteja formatado
+    let cruzado;
+    try {
+      cruzado = await Cruzado.findOne({
+        $expr: { $eq: [ { $regexReplace: { input: '$cpf', regex: '\\D', replacement: '' } }, cpfLimpo ] }
+      });
+    } catch (e) {
+      // Em caso de MongoDB incompatível com $regexReplace, tentar busca direta por CPF (sem formatação)
+      cruzado = await Cruzado.findOne({ cpf: cpfLimpo });
+      if (!cruzado) {
+        // tentar também por CPF exatamente como enviado (formatado)
+        cruzado = await Cruzado.findOne({ cpf });
+      }
+    }
+
     if (!cruzado) {
       return res.status(404).json({ message: 'Cadastro não encontrado!' });
     }
