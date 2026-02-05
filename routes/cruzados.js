@@ -498,13 +498,18 @@ router.put('/atualizar/:id', upload, async (req, res) => {
       novocertificadoId = uploadStream.id;
     }
 
-    // Preparar dados para atualização
+    // Preparar dados para atualização (não alterar certificadoIndicacao)
     const dadosAtualizacao = {
       ...req.body,
       foto: novaFotoId,
       certificadoIndicacao: novocertificadoId,
       updatedAt: Date.now()
     };
+    
+    // Remover certificadoIndicacao se vier vazio/inválido (manter o original)
+    if (!req.files || !req.files.certificadoIndicacao || !req.files.certificadoIndicacao[0]) {
+      delete dadosAtualizacao.certificadoIndicacao;
+    }
 
     // Atualizar Cruzado
     const cruzadoAtualizado = await Cruzado.findByIdAndUpdate(cruzadoId, dadosAtualizacao, { new: true });
