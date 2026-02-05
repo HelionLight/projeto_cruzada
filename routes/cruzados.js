@@ -376,34 +376,34 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
 // Buscar Cruzado por CPF (para edição)
 router.get('/buscar', async (req, res) => {
   try {
-    const cpf = req.query.cpf;
-    
-    if (!cpf || cpf.length !== 11) {
+    const cpfQuery = req.query.cpf;
+
+    if (!cpfQuery) {
       return res.status(400).json({ message: 'CPF inválido!' });
     }
 
-    // Normalizar CPF da query (somente dígitos)
-    const cpfLimpo = cpf.replace(/\D/g, '');
+    // 1) Tentar busca EXATA pelo valor salvo (útil se o banco guarda CPF formatado)
+    let cruzado = await Cruzado.findOne({ cpf: cpfQuery });
+    if (cruzado) return res.json(cruzado);
 
-    // Tentar buscar normalizando também o CPF armazenado (remove caracteres não numéricos)
-    // Utiliza $expr + $regexReplace para igualar mesmo que o CPF no banco esteja formatado
-    let cruzado;
+    // 2) Tentar buscar por versão sem formatação (somente dígitos)
+    const cpfLimpo = cpfQuery.replace(/\D/g, '');
+    if (cpfLimpo && cpfLimpo.length === 11) {
+      cruzado = await Cruzado.findOne({ cpf: cpfLimpo });
+      if (cruzado) return res.json(cruzado);
+    }
+
+    // 3) Fallback mais robusto: comparar removendo non-digits do campo no DB (se disponível)
     try {
       cruzado = await Cruzado.findOne({
         $expr: { $eq: [ { $regexReplace: { input: '$cpf', regex: '\\D', replacement: '' } }, cpfLimpo ] }
       });
+      if (cruzado) return res.json(cruzado);
     } catch (e) {
-      // Em caso de MongoDB incompatível com $regexReplace, tentar busca direta por CPF (sem formatação)
-      cruzado = await Cruzado.findOne({ cpf: cpfLimpo });
-      if (!cruzado) {
-        // tentar também por CPF exatamente como enviado (formatado)
-        cruzado = await Cruzado.findOne({ cpf });
-      }
+      // Ignorar; já tentamos os casos exatos e sem formatação
     }
 
-    if (!cruzado) {
-      return res.status(404).json({ message: 'Cadastro não encontrado!' });
-    }
+    return res.status(404).json({ message: 'Cadastro não encontrado!' });
 
     res.json(cruzado);
   } catch (err) {
