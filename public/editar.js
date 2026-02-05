@@ -102,9 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function buscarCadastro() {
-  const cpf = document.getElementById('cpfBusca').value.replace(/\D/g, '');
+  const cpfRaw = document.getElementById('cpfBusca').value;
   const dataNascimento = document.getElementById('dataNascimentoBusca').value;
 
+  // Validar presença de 11 dígitos, mas enviar o CPF exatamente como o usuário digitou
+  const cpf = cpfRaw.replace(/\D/g, '');
   if (!cpf || cpf.length !== 11) {
     alert('❌ CPF inválido: insira um CPF com 11 dígitos.');
     return;
@@ -116,7 +118,7 @@ async function buscarCadastro() {
   }
 
   try {
-    const response = await fetch(`/api/cruzados/buscar?cpf=${cpf}`);
+    const response = await fetch(`/api/cruzados/buscar?cpf=${encodeURIComponent(cpfRaw)}`);
     
     if (!response.ok) {
       alert('❌ Cadastro não encontrado. Verifique o CPF informado.');
