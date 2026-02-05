@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = formatarCPF(e.target.value);
   });
 
+
   // Formatação de Celular
   celularInput.addEventListener('input', (e) => {
     e.target.value = formatarCelular(e.target.value);
@@ -166,8 +167,7 @@ function preencherFormulario(cruzado) {
   document.getElementById('especificarSituacao').value = cruzado.especificarSituacao || '';
   document.getElementById('formacao').value = cruzado.formacao || '';
   document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
-  document.getElementById('nomeResponsavelIndicacao').value = cruzado.nomeResponsavelIndicacao || '';
-  document.getElementById('cpfResponsavelIndicacao').value = cruzado.cpfResponsavelIndicacao ? formatarCPF(cruzado.cpfResponsavelIndicacao) : '';
+  // Campos do responsável removidos conforme solicitado
   document.getElementById('desejaContribuir').value = cruzado.desejaContribuir ? 'true' : 'false';
   document.getElementById('valorContribuicao').value = cruzado.valorContribuicao || '';
   document.getElementById('consignacao').value = cruzado.consignacao ? 'true' : 'false';
@@ -176,9 +176,7 @@ function preencherFormulario(cruzado) {
   if (cruzado.foto) {
     document.getElementById('fotoInfo').textContent = '📷 Foto já existente (deixe em branco para não alterar)';
   }
-  if (cruzado.certificadoIndicacao) {
-    document.getElementById('certificadoInfo').textContent = '📄 PDF já existente (deixe em branco para não alterar)';
-  }
+  // certificadoIndicacao removido das atualizações
 
   // Ativar campos condicionais
   if (cruzado.vinculoProfissional === 'Outros') {
@@ -236,7 +234,6 @@ async function atualizarCadastro(e) {
 function limparFormulario() {
   document.getElementById('formAtualizacao').reset();
   document.getElementById('fotoInfo').textContent = '';
-  document.getElementById('certificadoInfo').textContent = '';
   document.getElementById('especificarVinculoContainer').style.display = 'none';
   document.getElementById('especificarSituacaoContainer').style.display = 'none';
   document.getElementById('contribuicaoContainer').style.display = 'none';

@@ -68,6 +68,28 @@ const cruzadoSchema = Joi.object({
 // Submeter formulário
 router.post('/register', upload, async (req, res) => {
   try {
+    // Sanitizar e normalizar campos recebidos (remover strings vazias, converter booleanos/números)
+    const sanitize = (body) => {
+      Object.keys(body).forEach((key) => {
+        const val = body[key];
+        if (val === '') {
+          delete body[key];
+          return;
+        }
+        if (typeof val === 'string') {
+          if (val === 'true') body[key] = true;
+          else if (val === 'false') body[key] = false;
+          else if (key === 'valorContribuicao') {
+            const n = Number(val);
+            if (!Number.isNaN(n)) body[key] = n;
+            else delete body[key];
+          }
+        }
+      });
+    };
+
+    sanitize(req.body);
+
     const { error } = cruzadoSchema.validate(req.body);
     if (error) {
       const field = error.details[0].context.label || error.details[0].path[0];
@@ -382,6 +404,28 @@ router.put('/atualizar/:id', upload, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(cruzadoId)) {
       return res.status(400).json({ message: 'ID inválido!' });
     }
+
+    // Sanitizar e normalizar campos recebidos antes da validação
+    const sanitize = (body) => {
+      Object.keys(body).forEach((key) => {
+        const val = body[key];
+        if (val === '') {
+          delete body[key];
+          return;
+        }
+        if (typeof val === 'string') {
+          if (val === 'true') body[key] = true;
+          else if (val === 'false') body[key] = false;
+          else if (key === 'valorContribuicao') {
+            const n = Number(val);
+            if (!Number.isNaN(n)) body[key] = n;
+            else delete body[key];
+          }
+        }
+      });
+    };
+
+    sanitize(req.body);
 
     // Validar dados
     const { error } = cruzadoSchema.validate(req.body);

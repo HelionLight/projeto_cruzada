@@ -28,12 +28,19 @@ function formatarCelular(celular) {
 document.addEventListener('DOMContentLoaded', () => {
   const cpfInput = document.getElementById('cpf');
   const celularInput = document.getElementById('celular');
+  const cpfResponsavelInput = document.getElementById('cpfResponsavelIndicacao');
   const vinculoSelect = document.getElementById('vinculoProfissional');
   const situacaoSelect = document.getElementById('situacaoProfissional');
   const desejaContribuirSelect = document.getElementById('desejaContribuir');
 
   if (cpfInput) {
     cpfInput.addEventListener('input', (e) => {
+      e.target.value = formatarCPF(e.target.value);
+    });
+  }
+
+  if (cpfResponsavelInput) {
+    cpfResponsavelInput.addEventListener('input', (e) => {
       e.target.value = formatarCPF(e.target.value);
     });
   }
