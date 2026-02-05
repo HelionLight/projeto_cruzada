@@ -456,9 +456,13 @@ router.put('/atualizar/:id', upload, async (req, res) => {
       return res.status(404).json({ message: 'Cadastro não encontrado!' });
     }
 
-    // Verificar se novo CPF já existe (se foi alterado)
-    if (req.body.cpf !== cruzadoExistente.cpf) {
-      const cpfJaExiste = await Cruzado.findOne({ cpf: req.body.cpf });
+    // Verificar se novo CPF já existe (se foi alterado) — comparar CPFs sem formatação
+    const cpfNovoLimpo = req.body.cpf ? req.body.cpf.replace(/\D/g, '') : '';
+    const cpfExistenteLimpo = cruzadoExistente.cpf ? cruzadoExistente.cpf.replace(/\D/g, '') : '';
+    if (cpfNovoLimpo !== cpfExistenteLimpo) {
+      const cpfJaExiste = await Cruzado.findOne({ 
+        $expr: { $eq: [ { $regexReplace: { input: '$cpf', regex: '\\D', replacement: '' } }, cpfNovoLimpo ] } 
+      });
       if (cpfJaExiste) {
         return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
       }

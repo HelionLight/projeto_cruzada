@@ -233,21 +233,25 @@ async function atualizarCadastro(e) {
 
   const formData = new FormData(e.target);
 
-  // Validar CPF (campo pode ser desabilitado/null)
+  // Validar CPF (remover formatação, se houver, e contar dígitos)
   const cpfRaw = formData.get('cpf');
   const cpf = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
-  if (cpf.length !== 14) {
+  if (!cpf || cpf.length !== 11) {
     alert('❌ CPF inválido: deve conter 11 dígitos.');
     return;
   }
 
-  // Validar Celular
+  // Validar Celular (remover formatação, se houver, e contar dígitos)
   const celularRaw = formData.get('celular');
   const celular = celularRaw ? celularRaw.replace(/\D/g, '') : '';
-  if (celular.length < 10) {
+  if (!celular || celular.length < 10) {
     alert('❌ Celular inválido: deve ter pelo menos 10 dígitos.');
     return;
   }
+
+  // Remover formatação antes de enviar (enviar CPF e celular sem caracteres especiais)
+  formData.set('cpf', cpf);
+  formData.set('celular', celular);
 
   try {
     const response = await fetch(`/api/cruzados/atualizar/${cruzadoId}`, {
