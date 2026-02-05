@@ -236,7 +236,7 @@ async function atualizarCadastro(e) {
   // Validar CPF (campo pode ser desabilitado/null)
   const cpfRaw = formData.get('cpf');
   const cpf = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
-  if (cpf.length !== 11) {
+  if (cpf.length !== 14) {
     alert('❌ CPF inválido: deve conter 11 dígitos.');
     return;
   }
