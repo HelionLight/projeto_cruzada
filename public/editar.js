@@ -261,7 +261,11 @@ async function atualizarCadastro(e) {
       // Resetar formulário
       document.getElementById('edicaoForm').style.display = 'none';
       document.getElementById('buscaForm').style.display = 'block';
-      document.getElementById('buscaForm').reset();
+      // Limpar inputs de busca
+      const cpfBusca = document.getElementById('cpfBusca');
+      const dataBusca = document.getElementById('dataNascimentoBusca');
+      if (cpfBusca) cpfBusca.value = '';
+      if (dataBusca) dataBusca.value = '';
       limparFormulario();
     } else {
       alert('❌ Erro ao atualizar: ' + (result.message || 'Tente novamente.'));
