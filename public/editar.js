@@ -38,67 +38,91 @@ document.addEventListener('DOMContentLoaded', () => {
   const desejaContribuirSelect = document.getElementById('desejaContribuir');
 
   // Formatação de CPF na busca
-  cpfBuscaInput.addEventListener('input', (e) => {
-    e.target.value = formatarCPF(e.target.value);
-  });
+  if (cpfBuscaInput) {
+    cpfBuscaInput.addEventListener('input', (e) => {
+      e.target.value = formatarCPF(e.target.value);
+    });
+  }
 
   // Formatação de CPF no formulário
-  cpfInput.addEventListener('input', (e) => {
-    e.target.value = formatarCPF(e.target.value);
-  });
-
+  if (cpfInput) {
+    cpfInput.addEventListener('input', (e) => {
+      e.target.value = formatarCPF(e.target.value);
+    });
+  }
 
   // Formatação de Celular
-  celularInput.addEventListener('input', (e) => {
-    e.target.value = formatarCelular(e.target.value);
-  });
+  if (celularInput) {
+    celularInput.addEventListener('input', (e) => {
+      e.target.value = formatarCelular(e.target.value);
+    });
+  }
 
   // Buscar cadastro
-  buscarBtn.addEventListener('click', buscarCadastro);
+  if (buscarBtn) buscarBtn.addEventListener('click', buscarCadastro);
 
   // Cancelar edição
-  cancelarBtn.addEventListener('click', () => {
-    document.getElementById('edicaoForm').style.display = 'none';
-    document.getElementById('buscaForm').style.display = 'block';
-    limparFormulario();
-  });
+  if (cancelarBtn) {
+    cancelarBtn.addEventListener('click', () => {
+      const edicao = document.getElementById('edicaoForm');
+      const busca = document.getElementById('buscaForm');
+      if (edicao) edicao.style.display = 'none';
+      if (busca) busca.style.display = 'block';
+      limparFormulario();
+    });
+  }
 
   // Campos condicionais - Vínculo
-  vinculoSelect.addEventListener('change', () => {
-    const container = document.getElementById('especificarVinculoContainer');
-    if (vinculoSelect.value === 'Outros') {
-      container.style.display = 'block';
-    } else {
-      container.style.display = 'none';
-      document.getElementById('especificarVinculo').value = '';
-    }
-  });
+  if (vinculoSelect) {
+    vinculoSelect.addEventListener('change', () => {
+      const container = document.getElementById('especificarVinculoContainer');
+      if (vinculoSelect.value === 'Outros') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+        const esp = document.getElementById('especificarVinculo');
+        if (esp) esp.value = '';
+      }
+    });
+  }
 
   // Campos condicionais - Situação
-  situacaoSelect.addEventListener('change', () => {
-    const container = document.getElementById('especificarSituacaoContainer');
-    if (situacaoSelect.value === 'Outros') {
-      container.style.display = 'block';
-    } else {
-      container.style.display = 'none';
-      document.getElementById('especificarSituacao').value = '';
-    }
-  });
+  if (situacaoSelect) {
+    situacaoSelect.addEventListener('change', () => {
+      const container = document.getElementById('especificarSituacaoContainer');
+      if (situacaoSelect.value === 'Outros') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+        const espSit = document.getElementById('especificarSituacao');
+        if (espSit) espSit.value = '';
+      }
+    });
+  }
 
   // Campos condicionais - Contribuição
-  desejaContribuirSelect.addEventListener('change', () => {
-    const container = document.getElementById('contribuicaoContainer');
-    if (desejaContribuirSelect.value === 'true') {
-      container.style.display = 'block';
-    } else {
-      container.style.display = 'none';
-      document.getElementById('valorContribuicao').value = '';
-      document.getElementById('consignacao').value = 'false';
-    }
-  });
+  if (desejaContribuirSelect) {
+    desejaContribuirSelect.addEventListener('change', () => {
+      const container = document.getElementById('contribuicaoContainer');
+      if (desejaContribuirSelect.value === 'true') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+        const val = document.getElementById('valorContribuicao');
+        const cons = document.getElementById('consignacao');
+        if (val) val.value = '';
+        if (cons) cons.value = 'false';
+      }
+    });
+  }
 
-  // Envio do formulário
-  document.getElementById('formAtualizacao').addEventListener('submit', atualizarCadastro);
+  // Envio do formulário (registrar de forma defensiva)
+  const formAtualizacao = document.getElementById('formAtualizacao');
+  if (formAtualizacao) {
+    formAtualizacao.addEventListener('submit', atualizarCadastro);
+  } else {
+    console.warn('formAtualizacao não encontrado — submit não será registrado.');
+  }
 });
 
 async function buscarCadastro() {
@@ -195,6 +219,12 @@ function preencherFormulario(cruzado) {
 async function atualizarCadastro(e) {
   e.preventDefault();
 
+  console.log('atualizarCadastro chamado', { cruzadoId });
+  if (!cruzadoId) {
+    alert('❌ Erro: ID do cadastro não definido. Busque o cadastro antes de salvar.');
+    return;
+  }
+
   const formData = new FormData(e.target);
 
   // Validar CPF
@@ -234,11 +264,12 @@ async function atualizarCadastro(e) {
 }
 
 function limparFormulario() {
-  document.getElementById('formAtualizacao').reset();
-  document.getElementById('fotoInfo').textContent = '';
-  document.getElementById('especificarVinculoContainer').style.display = 'none';
-  document.getElementById('especificarSituacaoContainer').style.display = 'none';
-  document.getElementById('contribuicaoContainer').style.display = 'none';
+  const form = document.getElementById('formAtualizacao');
+  if (form) form.reset();
+  const fotoInfo = document.getElementById('fotoInfo'); if (fotoInfo) fotoInfo.textContent = '';
+  const ev = document.getElementById('especificarVinculoContainer'); if (ev) ev.style.display = 'none';
+  const es = document.getElementById('especificarSituacaoContainer'); if (es) es.style.display = 'none';
+  const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.display = 'none';
   cruzadoId = null;
   cruzadoOriginal = null;
 }
