@@ -227,15 +227,17 @@ async function atualizarCadastro(e) {
 
   const formData = new FormData(e.target);
 
-  // Validar CPF
-  const cpf = formData.get('cpf').replace(/\D/g, '');
+  // Validar CPF (campo pode ser desabilitado/null)
+  const cpfRaw = formData.get('cpf');
+  const cpf = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
   if (cpf.length !== 11) {
     alert('❌ CPF inválido: deve conter 11 dígitos.');
     return;
   }
 
   // Validar Celular
-  const celular = formData.get('celular').replace(/\D/g, '');
+  const celularRaw = formData.get('celular');
+  const celular = celularRaw ? celularRaw.replace(/\D/g, '') : '';
   if (celular.length < 10) {
     alert('❌ Celular inválido: deve ter pelo menos 10 dígitos.');
     return;
