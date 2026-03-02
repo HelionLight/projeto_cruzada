@@ -88,6 +88,20 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Event listener para trabalho voluntário
+  const trabalharVoluntarioSelect = document.getElementById('trabalharVoluntario');
+  if (trabalharVoluntarioSelect) {
+    trabalharVoluntarioSelect.addEventListener('change', () => {
+      const container = document.getElementById('voluntarioContainer');
+      if (trabalharVoluntarioSelect.value === 'true') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+        document.getElementById('documentoVoluntario').value = '';
+      }
+    });
+  }
 });
 
 document.getElementById('registroForm').addEventListener('submit', async (e) => {

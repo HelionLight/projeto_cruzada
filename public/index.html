@@ -162,6 +162,25 @@
         </select>
       </div>
 
+      <h2>Trabalho Voluntário</h2>
+
+      <label for="trabalharVoluntario">Deseja trabalhar como voluntário?</label>
+      <select id="trabalharVoluntario" name="trabalharVoluntario" required>
+        <option value="false">Não</option>
+        <option value="true">Sim</option>
+      </select>
+
+      <div id="voluntarioContainer" style="display: none;">
+        <p style="margin-top: 10px; color: #666;">Para trabalhar como voluntário, baixe o termo, preencha, assinale e envie:</p>
+        
+        <div style="display: flex; gap: 10px; align-items: center; margin: 10px 0;">
+          <a href="TERMO_DE_ADESAO_VOLUNTARIO.docx" download style="padding: 10px 20px; background-color: #e74c3c; color: white; text-decoration: none; border-radius: 4px;">📥 Baixar Termo de Adesão</a>
+        </div>
+
+        <label for="documentoVoluntario">Enviar Termo de Adesão assinado (PDF):</label>
+        <input type="file" id="documentoVoluntario" name="documentoVoluntario" accept="application/pdf">
+      </div>
+
       <button type="submit">Enviar</button>
     </form>
   </div>
