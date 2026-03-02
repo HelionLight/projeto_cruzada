@@ -35,7 +35,8 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB por arquivo
 }).fields([
   { name: 'foto', maxCount: 1 },
-  { name: 'certificadoIndicacao', maxCount: 1 }
+  { name: 'certificadoIndicacao', maxCount: 1 },
+  { name: 'documentoVoluntario', maxCount: 1 }
 ]);
 
 // Validação do formulário
@@ -62,7 +63,8 @@ const cruzadoSchema = Joi.object({
   valorContribuicao: Joi.number().optional(),
   consignacao: Joi.boolean().optional(),
   numeroCruzado: Joi.string().optional(),
-  encarnado: Joi.boolean().required()
+  encarnado: Joi.boolean().required(),
+  trabalharVoluntario: Joi.boolean().optional()
 });
 
 // Submeter formulário
@@ -110,6 +112,7 @@ router.post('/register', upload, async (req, res) => {
 
     let fotoId = null;
     let certificadoId = null;
+    let documentoVoluntarioId = null;
 
     // Se há foto, salvar no GridFS
     if (req.files && req.files.foto && req.files.foto[0]) {
@@ -135,10 +138,23 @@ router.post('/register', upload, async (req, res) => {
       certificadoId = uploadStream.id;
     }
 
+    // Se há documento de voluntário, salvar no GridFS
+    if (req.files && req.files.documentoVoluntario && req.files.documentoVoluntario[0]) {
+      const bucket = getGridFSBucket();
+      const uploadStream = bucket.openUploadStream(req.files.documentoVoluntario[0].originalname, {
+        contentType: req.files.documentoVoluntario[0].mimetype
+      });
+
+      uploadStream.end(req.files.documentoVoluntario[0].buffer);
+
+      documentoVoluntarioId = uploadStream.id;
+    }
+
     const cruzadoData = {
       ...req.body,
       foto: fotoId,
-      certificadoIndicacao: certificadoId
+      certificadoIndicacao: certificadoId,
+      documentoVoluntario: documentoVoluntarioId
     };
 
     const cruzado = new CruzadoTemp(cruzadoData);

@@ -38,6 +38,8 @@ const cruzadoTempSchema = new mongoose.Schema({
   consignacao: { type: Boolean }, // Apenas para Marinha/Exército
   numeroCruzado: { type: String }, // Para alteração/exclusão
   encarnado: { type: Boolean, required: true },
+  trabalharVoluntario: { type: Boolean, default: false },
+  documentoVoluntario: { type: mongoose.Schema.Types.ObjectId }, // ID do arquivo no GridFS
   status: { type: String, enum: ['pendente', 'aprovado', 'rejeitado'], default: 'pendente' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
