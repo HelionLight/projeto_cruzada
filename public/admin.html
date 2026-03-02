@@ -16,7 +16,7 @@
       <button id="loginBtn">Entrar</button>
     </div>
     <div id="adminPanel" style="display: none;">
-      <h2>Registros Pendentes</h2>
+      <h2>Registros Pendentes - Cruzados</h2>
       <button id="exportBtn" class="btnExport">📥 Exportar para Excel</button>
       <div id="pendingList">
         <table class="pendingTable">
@@ -31,6 +31,24 @@
             </tr>
           </thead>
           <tbody id="pendingTableBody">
+          </tbody>
+        </table>
+      </div>
+
+      <h2 style="margin-top: 40px;">Registros Pendentes - Voluntários</h2>
+      <div id="pendingVoluntariosList">
+        <table class="pendingTable">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Nº Cruzado</th>
+              <th>Foto</th>
+              <th>Termo Assinado</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="pendingVoluntariosTableBody">
           </tbody>
         </table>
       </div>

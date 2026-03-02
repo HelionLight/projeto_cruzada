@@ -183,13 +183,24 @@ router.post('/register', upload, async (req, res) => {
   }
 });
 
-// Listar registros pendentes (admin)
+// Listar registros pendentes (admin) - apenas Cruzados
 router.get('/pending', authenticate, authorize('admin', 'secretario'), async (req, res) => {
   try {
-    const pendentes = await CruzadoTemp.find({ status: 'pendente' });
+    const pendentes = await CruzadoTemp.find({ status: 'pendente', trabalharVoluntario: { $ne: true } });
     res.json(pendentes);
   } catch (err) {
     console.error('Erro ao listar pendentes:', err);
+    res.status(500).json({ message: 'Erro interno do servidor' });
+  }
+});
+
+// Listar registros pendentes de voluntários (admin)
+router.get('/pending/voluntarios', authenticate, authorize('admin', 'secretario'), async (req, res) => {
+  try {
+    const voluntarios = await CruzadoTemp.find({ status: 'pendente', trabalharVoluntario: true });
+    res.json(voluntarios);
+  } catch (err) {
+    console.error('Erro ao listar voluntários:', err);
     res.status(500).json({ message: 'Erro interno do servidor' });
   }
 });

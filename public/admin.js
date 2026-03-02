@@ -31,6 +31,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('adminPanel').style.display = 'block';
       loadPending();
+      loadPendingVoluntarios();
     } else {
       alert('❌ Erro no login: ' + (result.message || 'Usuário ou senha incorretos.'));
     }
@@ -146,5 +147,87 @@ async function exportarExcel() {
     alert('✅ Excel exportado com sucesso!');
   } catch (error) {
     alert('❌ Erro ao exportar: ' + error.message);
+  }
+}
+
+// Carregar voluntários pendentes
+async function loadPendingVoluntarios() {
+  try {
+    const response = await fetch('/api/cruzados/pending/voluntarios', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      throw new Error('Não foi possível carregar os registros de voluntários.');
+    }
+
+    const voluntarios = await response.json();
+    const tbody = document.getElementById('pendingVoluntariosTableBody');
+    tbody.innerHTML = '';
+
+    if (voluntarios.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">✅ Nenhum registro de voluntário pendente.</td></tr>';
+      return;
+    }
+
+    voluntarios.forEach(voluntario => {
+      const row = document.createElement('tr');
+      
+      // Construir URL da foto
+      const fotoUrl = voluntario.foto ? `/api/cruzados/image/${voluntario.foto}` : null;
+      // URL do documento de voluntário (termo assinado)
+      const documentoUrl = voluntario.documentoVoluntario ? `/api/cruzados/image/${voluntario.documentoVoluntario}` : null;
+      
+      row.innerHTML = `
+        <td>${voluntario.nome}</td>
+        <td>${voluntario.email}</td>
+        <td>${voluntario.numeroCruzado || '-'}</td>
+        <td>
+          ${fotoUrl ? `<a href="${fotoUrl}" target="_blank"><button class="btnView">Ver Foto</button></a>` : 'Sem foto'}
+        </td>
+        <td>
+          ${documentoUrl ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Ver Termo</button></a>` : 'Sem termo'}
+        </td>
+        <td>
+          <button class="btnApprove" onclick="approveVoluntario('${voluntario._id}')">Aprovar</button>
+          <button class="btnReject" onclick="rejectVoluntario('${voluntario._id}')">Rejeitar</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (error) {
+    alert('❌ Erro ao carregar voluntários: ' + error.message);
+  }
+}
+
+async function approveVoluntario(id) {
+  await updateStatusVoluntario(id, 'aprovado');
+}
+
+async function rejectVoluntario(id) {
+  await updateStatusVoluntario(id, 'rejeitado');
+}
+
+async function updateStatusVoluntario(id, status) {
+  try {
+    const response = await fetch(`/api/cruzados/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ status })
+    });
+
+    if (response.ok) {
+      const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
+      alert(`✅ Voluntário ${statusText} com sucesso!`);
+      loadPendingVoluntarios();
+    } else {
+      const error = await response.json();
+      alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));
+    }
+  } catch (error) {
+    alert('❌ Erro de conexão: ' + error.message);
   }
 }
