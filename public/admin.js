@@ -1,5 +1,22 @@
 // Painel Admin
 let token = '';
+let pendingRefreshTimer = null;
+
+function refreshPendingLists() {
+  loadPending();
+  loadPendingVoluntarios();
+  loadPendingConsignacao();
+}
+
+function startPendingAutoRefresh() {
+  if (pendingRefreshTimer) {
+    clearInterval(pendingRefreshTimer);
+  }
+
+  pendingRefreshTimer = setInterval(() => {
+    refreshPendingLists();
+  }, 10000);
+}
 
 // Event listener para botão de exportação
 document.addEventListener('DOMContentLoaded', () => {
@@ -30,9 +47,8 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       token = result.token;
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('adminPanel').style.display = 'block';
-      loadPending();
-      loadPendingVoluntarios();
-      loadPendingConsignacao();
+      refreshPendingLists();
+      startPendingAutoRefresh();
     } else {
       alert('❌ Erro no login: ' + (result.message || 'Usuário ou senha incorretos.'));
     }
@@ -111,8 +127,7 @@ async function updateStatus(id, status) {
     if (response.ok) {
       const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
       alert(`✅ Registro ${statusText} com sucesso!`);
-      loadPending();
-      loadPendingConsignacao();
+      refreshPendingLists();
     } else {
       const error = await response.json();
       alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));
