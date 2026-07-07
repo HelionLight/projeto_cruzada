@@ -46,7 +46,8 @@ O que foi feito:
 - adicionado no formulário uma seção para consignação em folha;
 - ao marcar “Sim”, o formulário mostra a opção de baixar o termo e enviar o PDF;
 - o PDF enviado é salvo no sistema e fica associado ao cadastro;
-- criado no painel administrativo uma nova tabela para visualizar os registros de consignação e baixar o PDF enviado.
+- criado no painel administrativo uma nova tabela para visualizar os registros de consignação e baixar o PDF enviado;
+- adicionados botões de aprovar/rejeitar na tabela de consignação após a revisão do documento.
 
 O que depende de você:
 - fornecer o modelo oficial do termo de consignação em folha para ser colocado na pasta futura;

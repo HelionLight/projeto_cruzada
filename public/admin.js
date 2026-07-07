@@ -240,6 +240,10 @@ async function loadPendingConsignacao() {
         <td>
           ${documentoUrl ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Baixar PDF</button></a>` : 'Sem PDF'}
         </td>
+        <td>
+          <button class="btnApprove" onclick="approveConsignacao('${registro._id}')">Aprovar</button>
+          <button class="btnReject" onclick="rejectConsignacao('${registro._id}')">Rejeitar</button>
+        </td>
       `;
       tbody.appendChild(row);
     });
@@ -263,6 +267,39 @@ async function updateStatusVoluntario(id, status) {
       const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
       alert(`✅ Voluntário ${statusText} com sucesso!`);
       loadPendingVoluntarios();
+      loadPendingConsignacao();
+    } else {
+      const error = await response.json();
+      alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));
+    }
+  } catch (error) {
+    alert('❌ Erro de conexão: ' + error.message);
+  }
+}
+
+async function approveConsignacao(id) {
+  await updateStatusConsignacao(id, 'aprovado');
+}
+
+async function rejectConsignacao(id) {
+  await updateStatusConsignacao(id, 'rejeitado');
+}
+
+async function updateStatusConsignacao(id, status) {
+  try {
+    const response = await fetch(`/api/cruzados/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ status })
+    });
+
+    if (response.ok) {
+      const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
+      alert(`✅ Consignação ${statusText} com sucesso!`);
+      loadPendingConsignacao();
     } else {
       const error = await response.json();
       alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));

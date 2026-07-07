@@ -41,7 +41,7 @@ const cruzadoSchema = new mongoose.Schema({
   encarnado: { type: Boolean, required: true },
   trabalharVoluntario: { type: Boolean, default: false },
   documentoVoluntario: { type: mongoose.Schema.Types.ObjectId }, // ID do arquivo no GridFS
-  status: { type: String, enum: ['pendente', 'aprovado', 'rejeitado'], default: 'pendente' },
+  status: { type: String, enum: ['pendente', 'aguardando_documentos', 'aprovado', 'rejeitado'], default: 'pendente' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

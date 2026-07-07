@@ -212,7 +212,7 @@ router.get('/pending', authenticate, authorize('admin', 'secretario'), async (re
 // Listar registros pendentes de voluntários (admin)
 router.get('/pending/voluntarios', authenticate, authorize('admin', 'secretario'), async (req, res) => {
   try {
-    const voluntarios = await CruzadoTemp.find({ status: 'pendente', trabalharVoluntario: true });
+    const voluntarios = await CruzadoTemp.find({ status: 'aguardando_documentos', trabalharVoluntario: true, documentoVoluntario: { $exists: true, $ne: null } });
     res.json(voluntarios);
   } catch (err) {
     console.error('Erro ao listar voluntários:', err);
@@ -233,6 +233,13 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
     if (!tempCruzado) return res.status(404).json({ message: 'Registro não encontrado!' });
 
     if (status === 'aprovado') {
+      const precisaRevisaoDocumental = Boolean(tempCruzado.trabalharVoluntario || tempCruzado.documentoConsignacao || tempCruzado.documentoVoluntario);
+
+      if (precisaRevisaoDocumental) {
+        await CruzadoTemp.findByIdAndUpdate(req.params.id, { status: 'aguardando_documentos', updatedAt: Date.now() });
+        return res.json({ message: 'Registro aprovado para revisão documental.' });
+      }
+
       // Mover para coleção permanente
       const permanentCruzado = new Cruzado({
         ...tempCruzado.toObject(),
@@ -320,11 +327,11 @@ router.get('/image/:id', async (req, res) => {
 // Listar registros com documento de consignação em folha
 router.get('/consignacao', authenticate, authorize('admin', 'secretario'), async (req, res) => {
   try {
-    const registros = await Cruzado.find({
-      status: 'aprovado',
+    const registros = await CruzadoTemp.find({
+      status: 'aguardando_documentos',
       consignacao: true,
       documentoConsignacao: { $exists: true, $ne: null }
-    }).sort({ createdAt: -1 }).select('nome email cpf numeroCruzado documentoConsignacao');
+    }).sort({ createdAt: -1 }).select('nome email cpf numeroCruzado documentoConsignacao _id');
 
     res.json(registros);
   } catch (err) {
