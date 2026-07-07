@@ -85,6 +85,20 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.display = 'none';
         document.getElementById('valorContribuicao').value = '';
         document.getElementById('consignacao').value = 'false';
+        document.getElementById('consignacaoDocumentoContainer').style.display = 'none';
+      }
+    });
+  }
+
+  const consignacaoSelect = document.getElementById('consignacao');
+  if (consignacaoSelect) {
+    consignacaoSelect.addEventListener('change', () => {
+      const container = document.getElementById('consignacaoDocumentoContainer');
+      if (consignacaoSelect.value === 'true') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+        document.getElementById('documentoConsignacao').value = '';
       }
     });
   }

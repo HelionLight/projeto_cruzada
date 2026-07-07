@@ -110,8 +110,26 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.display = 'none';
         const val = document.getElementById('valorContribuicao');
         const cons = document.getElementById('consignacao');
+        const docContainer = document.getElementById('consignacaoDocumentoContainer');
+        const docInput = document.getElementById('documentoConsignacao');
         if (val) val.value = '';
         if (cons) cons.value = 'false';
+        if (docContainer) docContainer.style.display = 'none';
+        if (docInput) docInput.value = '';
+      }
+    });
+  }
+
+  const consignacaoSelect = document.getElementById('consignacao');
+  if (consignacaoSelect) {
+    consignacaoSelect.addEventListener('change', () => {
+      const container = document.getElementById('consignacaoDocumentoContainer');
+      if (consignacaoSelect.value === 'true') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+        const docInput = document.getElementById('documentoConsignacao');
+        if (docInput) docInput.value = '';
       }
     });
   }
@@ -215,6 +233,9 @@ function preencherFormulario(cruzado) {
   }
   if (cruzado.desejaContribuir) {
     document.getElementById('contribuicaoContainer').style.display = 'block';
+  }
+  if (cruzado.consignacao) {
+    document.getElementById('consignacaoDocumentoContainer').style.display = 'block';
   }
 }
 

@@ -32,6 +32,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       document.getElementById('adminPanel').style.display = 'block';
       loadPending();
       loadPendingVoluntarios();
+      loadPendingConsignacao();
     } else {
       alert('❌ Erro no login: ' + (result.message || 'Usuário ou senha incorretos.'));
     }
@@ -111,6 +112,7 @@ async function updateStatus(id, status) {
       const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
       alert(`✅ Registro ${statusText} com sucesso!`);
       loadPending();
+      loadPendingConsignacao();
     } else {
       const error = await response.json();
       alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));
@@ -206,6 +208,44 @@ async function approveVoluntario(id) {
 
 async function rejectVoluntario(id) {
   await updateStatusVoluntario(id, 'rejeitado');
+}
+
+async function loadPendingConsignacao() {
+  try {
+    const response = await fetch('/api/cruzados/consignacao', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      throw new Error('Não foi possível carregar os documentos de consignação.');
+    }
+
+    const registros = await response.json();
+    const tbody = document.getElementById('pendingConsignacaoTableBody');
+    tbody.innerHTML = '';
+
+    if (registros.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">✅ Nenhum documento de consignação pendente.</td></tr>';
+      return;
+    }
+
+    registros.forEach(registro => {
+      const row = document.createElement('tr');
+      const documentoUrl = registro.documentoConsignacao ? `/api/cruzados/image/${registro.documentoConsignacao}` : null;
+
+      row.innerHTML = `
+        <td>${registro.nome}</td>
+        <td>${registro.email}</td>
+        <td>${registro.numeroCruzado || '-'}</td>
+        <td>
+          ${documentoUrl ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Baixar PDF</button></a>` : 'Sem PDF'}
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (error) {
+    alert('❌ Erro ao carregar consignações: ' + error.message);
+  }
 }
 
 async function updateStatusVoluntario(id, status) {

@@ -36,7 +36,8 @@ const upload = multer({
 }).fields([
   { name: 'foto', maxCount: 1 },
   { name: 'certificadoIndicacao', maxCount: 1 },
-  { name: 'documentoVoluntario', maxCount: 1 }
+  { name: 'documentoVoluntario', maxCount: 1 },
+  { name: 'documentoConsignacao', maxCount: 1 }
 ]);
 
 // Validação do formulário
@@ -113,6 +114,7 @@ router.post('/register', upload, async (req, res) => {
     let fotoId = null;
     let certificadoId = null;
     let documentoVoluntarioId = null;
+    let documentoConsignacaoId = null;
 
     // Se há foto, salvar no GridFS
     if (req.files && req.files.foto && req.files.foto[0]) {
@@ -150,11 +152,24 @@ router.post('/register', upload, async (req, res) => {
       documentoVoluntarioId = uploadStream.id;
     }
 
+    // Se há documento de consignação, salvar no GridFS
+    if (req.files && req.files.documentoConsignacao && req.files.documentoConsignacao[0]) {
+      const bucket = getGridFSBucket();
+      const uploadStream = bucket.openUploadStream(req.files.documentoConsignacao[0].originalname, {
+        contentType: req.files.documentoConsignacao[0].mimetype
+      });
+
+      uploadStream.end(req.files.documentoConsignacao[0].buffer);
+
+      documentoConsignacaoId = uploadStream.id;
+    }
+
     const cruzadoData = {
       ...req.body,
       foto: fotoId,
       certificadoIndicacao: certificadoId,
-      documentoVoluntario: documentoVoluntarioId
+      documentoVoluntario: documentoVoluntarioId,
+      documentoConsignacao: documentoConsignacaoId
     };
 
     const cruzado = new CruzadoTemp(cruzadoData);
@@ -299,6 +314,22 @@ router.get('/image/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao servir arquivo:', err);
     res.status(500).json({ message: 'Erro ao recuperar arquivo. Tente novamente.' });
+  }
+});
+
+// Listar registros com documento de consignação em folha
+router.get('/consignacao', authenticate, authorize('admin', 'secretario'), async (req, res) => {
+  try {
+    const registros = await Cruzado.find({
+      status: 'aprovado',
+      consignacao: true,
+      documentoConsignacao: { $exists: true, $ne: null }
+    }).sort({ createdAt: -1 }).select('nome email cpf numeroCruzado documentoConsignacao');
+
+    res.json(registros);
+  } catch (err) {
+    console.error('Erro ao listar consignação:', err);
+    res.status(500).json({ message: 'Erro interno do servidor' });
   }
 });
 
@@ -506,6 +537,7 @@ router.put('/atualizar/:id', upload, async (req, res) => {
     // Processar novos arquivos se enviados
     let novaFotoId = cruzadoExistente.foto;
     let novocertificadoId = cruzadoExistente.certificadoIndicacao;
+    let novoDocumentoConsignacaoId = cruzadoExistente.documentoConsignacao;
 
     if (req.files && req.files.foto && req.files.foto[0]) {
       const bucket = getGridFSBucket();
@@ -525,6 +557,15 @@ router.put('/atualizar/:id', upload, async (req, res) => {
       novocertificadoId = uploadStream.id;
     }
 
+    if (req.files && req.files.documentoConsignacao && req.files.documentoConsignacao[0]) {
+      const bucket = getGridFSBucket();
+      const uploadStream = bucket.openUploadStream(req.files.documentoConsignacao[0].originalname, {
+        contentType: req.files.documentoConsignacao[0].mimetype
+      });
+      uploadStream.end(req.files.documentoConsignacao[0].buffer);
+      novoDocumentoConsignacaoId = uploadStream.id;
+    }
+
     // Preparar dados para atualização (não alterar certificadoIndicacao)
     const dadosAtualizacao = {
       ...req.body,
@@ -532,6 +573,10 @@ router.put('/atualizar/:id', upload, async (req, res) => {
       certificadoIndicacao: novocertificadoId,
       updatedAt: Date.now()
     };
+
+    if (novoDocumentoConsignacaoId) {
+      dadosAtualizacao.documentoConsignacao = novoDocumentoConsignacaoId;
+    }
     
     // Remover certificadoIndicacao se vier vazio/inválido (manter o original)
     if (!req.files || !req.files.certificadoIndicacao || !req.files.certificadoIndicacao[0]) {
