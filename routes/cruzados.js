@@ -201,14 +201,7 @@ router.post('/register', upload, async (req, res) => {
 // Listar registros pendentes (admin) - sempre consultando a coleção temporária
 router.get('/pending', authenticate, authorize('admin', 'secretario'), async (req, res) => {
   try {
-    const pendentes = await CruzadoTemp.find({
-      status: 'pendente',
-      $or: [
-        { trabalharVoluntario: { $exists: false } },
-        { trabalharVoluntario: { $ne: true } }
-      ]
-    }).sort({ createdAt: -1 });
-
+    const pendentes = await CruzadoTemp.find({ status: 'pendente' }).sort({ createdAt: -1 });
     res.json(pendentes);
   } catch (err) {
     console.error('Erro ao listar pendentes:', err);
