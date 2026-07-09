@@ -3,10 +3,13 @@ const multer = require('multer');
 const path = require('path');
 const mongoose = require('mongoose');
 const XLSX = require('xlsx');
+const nodemailer = require('nodemailer');
 const Cruzado = require('../models/Cruzado');
 const CruzadoTemp = require('../models/CruzadoTemp');
 const { authenticate, authorize } = require('../middleware/auth');
+const verifyEditToken = require('../middleware/verifyEditToken');
 const Joi = require('joi');
+const CruzadoCounter = require('../models/CruzadoCounter');
 
 const router = express.Router();
 
@@ -39,6 +42,69 @@ const upload = multer({
   { name: 'documentoVoluntario', maxCount: 1 },
   { name: 'documentoConsignacao', maxCount: 1 }
 ]);
+
+// Configuração do envio de e-mail para o secretário
+const getEmailTransporter = () => {
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+    auth: {
+      user: smtpUser,
+      pass: smtpPass
+    }
+  });
+};
+
+const enviarAlertaSecretario = async () => {
+  const enabled = String(process.env.EMAIL_ALERT_ENABLED || 'true').toLowerCase() !== 'false';
+  if (!enabled) return;
+
+  const transporter = getEmailTransporter();
+  if (!transporter) {
+    console.log('Alerta por e-mail não enviado: SMTP não configurado.');
+    return;
+  }
+
+  try {
+    const pendentes = await CruzadoTemp.countDocuments({
+      status: { $in: ['pendente', 'aguardando_documentos'] }
+    });
+
+    const destinatario = process.env.SECRETARIO_EMAIL || process.env.EMAIL_USER || 'secretaria@cme.org.br';
+    const assunto = `Novo cadastro recebido - ${pendentes} pendente${pendentes === 1 ? '' : 's'}`;
+    const texto = `Olá, secretário(a)!\n\nUm novo cadastro foi realizado no sistema da Cruzada.\nAtualmente existem ${pendentes} cadastro(s) pendente(s) aguardando avaliação.\n\nAcesse o painel administrativo para revisar os registros.`;
+    const html = `
+      <div style="font-family: Arial, sans-serif;">
+        <h2>Novo cadastro recebido</h2>
+        <p>Olá, secretário(a)!</p>
+        <p>Um novo cadastro foi realizado no sistema da Cruzada.</p>
+        <p>Atualmente existem <strong>${pendentes}</strong> cadastro(s) pendente(s) aguardando avaliação.</p>
+        <p>Acesse o painel administrativo para revisar os registros.</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: destinatario,
+      subject: assunto,
+      text: texto,
+      html
+    });
+
+    console.log(`Alerta por e-mail enviado para ${destinatario}`);
+  } catch (err) {
+    console.error('Erro ao enviar alerta por e-mail:', err);
+  }
+};
 
 // Validação do formulário
 const cruzadoSchema = Joi.object({
@@ -99,8 +165,30 @@ router.post('/register', upload, async (req, res) => {
       return res.status(400).json({ message: `Campo inválido: ${field}. ${error.details[0].message}` });
     }
 
+    // Validação de documentos obrigatórios (2.2)
+    // certificadoIndicacao: obrigatório sempre
+    const hasCertificadoIndicacao = Boolean(req.files && req.files.certificadoIndicacao && req.files.certificadoIndicacao[0]);
+    if (!hasCertificadoIndicacao) {
+      return res.status(400).json({ message: 'Documento de Certificado de Indicação (PDF) é obrigatório!' });
+    }
+
+    // documentoVoluntario: obrigatório se trabalharVoluntario === true
+    const trabalharVoluntario = Boolean(req.body.trabalharVoluntario);
+    const hasDocumentoVoluntario = Boolean(req.files && req.files.documentoVoluntario && req.files.documentoVoluntario[0]);
+    if (trabalharVoluntario && !hasDocumentoVoluntario) {
+      return res.status(400).json({ message: 'Documento de Termo de Adesão/Voluntário (PDF) é obrigatório quando trabalharVoluntario é Sim!' });
+    }
+
+    // documentoConsignacao: obrigatório se consignacao === true
+    const consignacao = Boolean(req.body.consignacao);
+    const hasDocumentoConsignacao = Boolean(req.files && req.files.documentoConsignacao && req.files.documentoConsignacao[0]);
+    if (consignacao && !hasDocumentoConsignacao) {
+      return res.status(400).json({ message: 'Documento de Consignação em Folha (PDF) é obrigatório quando consignacao é Sim!' });
+    }
+
     // Verificar CPF duplicado
     const cpfExistente = await CruzadoTemp.findOne({ cpf: req.body.cpf });
+
     if (cpfExistente) {
       return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
     }
@@ -174,6 +262,7 @@ router.post('/register', upload, async (req, res) => {
 
     const cruzado = new CruzadoTemp(cruzadoData);
     await cruzado.save();
+    await enviarAlertaSecretario();
     res.status(201).json({ message: 'Registro enviado para aprovação' });
   } catch (err) {
     console.error('Erro ao registrar:', err);
@@ -240,20 +329,98 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
         return res.json({ message: 'Registro aprovado para revisão documental.' });
       }
 
+      // Aprovação final: atribuir numeroCruzado (contador atômico) e enviar e-mail 3.1
+      const counter = await CruzadoCounter.findByIdAndUpdate(
+        'cruzado',
+        { $setOnInsert: { nextNumeroCruzado: 7999 } },
+        { upsert: true, new: true }
+      );
+
+      const counter2 = await CruzadoCounter.findByIdAndUpdate(
+        'cruzado',
+        { $inc: { nextNumeroCruzado: 1 } },
+        { new: true }
+      );
+
+      const numeroCruzado = String(counter2.nextNumeroCruzado);
+
       // Mover para coleção permanente
       const permanentCruzado = new Cruzado({
         ...tempCruzado.toObject(),
+        numeroCruzado,
         status: 'aprovado',
         updatedAt: Date.now()
       });
+
       await permanentCruzado.save();
+
       // Remover da temporária
       await CruzadoTemp.findByIdAndDelete(req.params.id);
+
+      // Enviar e-mail do candidato (aprovado)
+      try {
+        const transporter = getEmailTransporter();
+        if (transporter) {
+          const assuntoCandidato = 'Cadastro aprovado - Cruzada';
+          const textoCandidato = `Olá, ${tempCruzado.nome}!\n\nSeu cadastro foi APROVADO.\n\nNúmero Cruzado: ${numeroCruzado}\n\nCarteirinha digital: (placeholder)\n\nObrigado!`;
+          const htmlCandidato = `
+            <div style="font-family: Arial, sans-serif;">
+              <h3>Cadastro aprovado</h3>
+              <p>Olá, <strong>${tempCruzado.nome}</strong>!</p>
+              <p>Seu cadastro foi <strong>APROVADO</strong>.</p>
+              <p><strong>Número Cruzado:</strong> ${numeroCruzado}</p>
+              <p>Carteirinha digital: (placeholder)</p>
+              <p>Obrigado!</p>
+            </div>
+          `;
+
+          await transporter.sendMail({
+            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            to: tempCruzado.email,
+            subject: assuntoCandidato,
+            text: textoCandidato,
+            html: htmlCandidato
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao enviar e-mail do candidato (aprovado):', e);
+      }
+
       res.json({ message: 'Registro aprovado e movido para banco permanente!' });
-    } else if (status === 'rejeitado') {
-      // Apenas marcar como rejeitado na temporária (será deletado pelo TTL)
-      await CruzadoTemp.findByIdAndUpdate(req.params.id, { status: 'rejeitado', updatedAt: Date.now() });
-      res.json({ message: 'Registro rejeitado com sucesso!' });
+  } else if (status === 'rejeitado') {
+      // Enviar e-mail de recusa 3.2 (precisa do temp antes de deletar)
+      try {
+        const temp = tempCruzado;
+        const transporter = getEmailTransporter();
+        if (transporter) {
+          const assuntoCandidato = 'Cadastro recusado - Cruzada';
+          const textoCandidato = `Olá, ${temp.nome}!\n\nSeu cadastro foi RECUSADO pela administração.\n\nNúmero Cruzado: (não atribuído)\n\nObrigado.`;
+          const htmlCandidato = `
+            <div style="font-family: Arial, sans-serif;">
+              <h3>Cadastro recusado</h3>
+              <p>Olá, <strong>${temp.nome}</strong>!</p>
+              <p>Seu cadastro foi <strong>RECUSADO</strong> pela administração.</p>
+              <p>Número Cruzado: (não atribuído)</p>
+              <p>Obrigado!</p>
+            </div>
+          `;
+
+          await transporter.sendMail({
+            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            to: temp.email,
+            subject: assuntoCandidato,
+            text: textoCandidato,
+            html: htmlCandidato
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao enviar e-mail do candidato (rejeitado):', e);
+      }
+
+      // Deletar imediatamente da temporária
+      await CruzadoTemp.findByIdAndDelete(req.params.id);
+      res.json({ message: 'Registro rejeitado e removido com sucesso!' });
+
     }
   } catch (err) {
     console.error('Erro ao atualizar status:', err);
@@ -478,7 +645,7 @@ router.get('/buscar', async (req, res) => {
 });
 
 // Atualizar Cruzado por ID (para edição do usuário)
-router.put('/atualizar/:id', upload, async (req, res) => {
+router.put('/atualizar/:id', upload, verifyEditToken, async (req, res) => {
   try {
     const cruzadoId = req.params.id;
 

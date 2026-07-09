@@ -22,6 +22,7 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 // Rotas
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/cruzados', require('./routes/cruzados'));
+app.use('/api/auth/email-verification', require('./routes/emailVerification'));
 
 // Servir frontend estático (se houver)
 app.use(express.static(path.join(__dirname, 'public')));

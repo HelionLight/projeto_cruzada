@@ -26,6 +26,7 @@ function formatarCelular(celular) {
 
 let cruzadoId = null;
 let cruzadoOriginal = null;
+let editToken = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   const buscarBtn = document.getElementById('buscarBtn');
@@ -36,6 +37,132 @@ document.addEventListener('DOMContentLoaded', () => {
   const vinculoSelect = document.getElementById('vinculoProfissional');
   const situacaoSelect = document.getElementById('situacaoProfissional');
   const desejaContribuirSelect = document.getElementById('desejaContribuir');
+
+  const codigoForm = document.getElementById('codigoForm');
+  const solicitarCodigoBtn = document.getElementById('solicitarCodigoBtn');
+  const verificarCodigoBtn = document.getElementById('verificarCodigoBtn');
+  const statusCodigo = document.getElementById('statusCodigo');
+  const codigoInput = document.getElementById('codigo');
+
+  const habilitarEdicao = (habilitar) => {
+    const form = document.getElementById('formAtualizacao');
+    if (!form) return;
+    const elements = form.querySelectorAll('input, select, textarea, button');
+    elements.forEach((el) => {
+      // mantém o submit e cancelar conforme o modo
+      if (el.id === 'salvarBtn' || el.id === 'cancelarBtn') {
+        el.disabled = !habilitar;
+      } else {
+        el.disabled = !habilitar;
+      }
+    });
+
+    // não desabilitar upload/campo cpf readonly etc. (input cpf é readonly no HTML)
+    const salvarBtn = document.getElementById('salvarBtn');
+    if (salvarBtn) salvarBtn.disabled = !habilitar;
+  };
+
+  const setStatusCodigo = (msg) => {
+    if (!statusCodigo) return;
+    statusCodigo.textContent = msg || '';
+  };
+
+  const mostrarEtapaCodigo = () => {
+    const codigoFormEl = document.getElementById('codigoForm');
+    const edicaoFormEl = document.getElementById('edicaoForm');
+    const buscaFormEl = document.getElementById('buscaForm');
+    if (codigoFormEl) codigoFormEl.style.display = 'block';
+    if (edicaoFormEl) edicaoFormEl.style.display = 'none';
+    if (buscaFormEl) buscaFormEl.style.display = 'block';
+  };
+
+  const solicitarCodigo = async () => {
+    try {
+      if (!cruzadoId) {
+        alert('❌ Busque o cadastro antes de solicitar o código.');
+        return;
+      }
+
+      const cpfRaw = document.getElementById('cpfBusca')?.value;
+      const cpfNormalizado = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
+      if (!cpfNormalizado || cpfNormalizado.length !== 11) {
+        alert('❌ CPF inválido para solicitar código.');
+        return;
+      }
+
+      setStatusCodigo('📨 Enviando código...');
+      editToken = null;
+
+      const resp = await fetch('/api/auth/email-verification/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cpf: cpfNormalizado })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.message || 'Erro ao solicitar código.');
+      }
+
+      setStatusCodigo('✅ Código enviado. Verifique seu e-mail e digite abaixo.');
+      habilitarEdicao(false);
+    } catch (e) {
+      setStatusCodigo('❌ ' + e.message);
+      alert('❌ ' + e.message);
+    }
+  };
+
+  const verificarCodigo = async () => {
+    try {
+      if (!cruzadoId) {
+        alert('❌ Busque o cadastro antes de verificar o código.');
+        return;
+      }
+
+      const cpfRaw = document.getElementById('cpfBusca')?.value;
+      const cpfNormalizado = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
+      const code = (codigoInput?.value || '').replace(/\D/g, '');
+      if (!cpfNormalizado || cpfNormalizado.length !== 11) {
+        alert('❌ CPF inválido.');
+        return;
+      }
+      if (!code) {
+        alert('❌ Digite o código recebido.');
+        return;
+      }
+
+      setStatusCodigo('🔎 Verificando código...');
+
+      const resp = await fetch('/api/auth/email-verification/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cpf: cpfNormalizado, code })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.message || 'Código inválido.');
+      }
+
+      editToken = data.token;
+      setStatusCodigo('✅ Código validado. Você já pode editar e salvar.');
+      habilitarEdicao(true);
+      const edicaoForm = document.getElementById('edicaoForm');
+      if (edicaoForm) edicaoForm.style.display = 'block';
+    } catch (e) {
+      editToken = null;
+      habilitarEdicao(false);
+      setStatusCodigo('❌ ' + e.message);
+      alert('❌ ' + e.message);
+    }
+  };
+
+  // inicialmente, edição desabilitada até validar código
+  habilitarEdicao(false);
+
+  if (solicitarCodigoBtn) solicitarCodigoBtn.addEventListener('click', solicitarCodigo);
+  if (verificarCodigoBtn) verificarCodigoBtn.addEventListener('click', verificarCodigo);
+
 
   // Formatação de CPF na busca
   if (cpfBuscaInput) {
@@ -66,8 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelarBtn.addEventListener('click', () => {
       const edicao = document.getElementById('edicaoForm');
       const busca = document.getElementById('buscaForm');
+      const codigoForm = document.getElementById('codigoForm');
       if (edicao) edicao.style.display = 'none';
       if (busca) busca.style.display = 'block';
+      if (codigoForm) codigoForm.style.display = 'none';
       limparFormulario();
     });
   }
@@ -183,11 +312,12 @@ async function buscarCadastro() {
     // Preencher formulário
     preencherFormulario(cruzado);
 
-    // Mostrar formulário de edição
-    document.getElementById('buscaForm').style.display = 'none';
-    document.getElementById('edicaoForm').style.display = 'block';
+    // Mostrar etapa de validação por e-mail antes de liberar a edição
+    mostrarEtapaCodigo();
+    if (codigoInput) codigoInput.value = '';
+    if (statusCodigo) statusCodigo.textContent = '📩 Envie o código para liberar a edição.';
 
-    alert('✅ Cadastro encontrado! Você pode atualizar suas informações.');
+    alert('✅ Cadastro encontrado! Envie o código recebido por e-mail para liberar a edição.');
   } catch (error) {
     alert('❌ Erro ao buscar cadastro: ' + error.message);
   }
@@ -270,11 +400,20 @@ async function atualizarCadastro(e) {
   formData.set('cpf', cpf);
   formData.set('celular', celular);
 
+  if (!editToken) {
+    alert('❌ Você precisa validar o código por e-mail antes de salvar.');
+    return;
+  }
+
   try {
     const response = await fetch(`/api/cruzados/atualizar/${cruzadoId}`, {
       method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${editToken}`
+      },
       body: formData
     });
+
 
     const result = await response.json();
     if (response.ok) {
@@ -303,6 +442,11 @@ function limparFormulario() {
   const ev = document.getElementById('especificarVinculoContainer'); if (ev) ev.style.display = 'none';
   const es = document.getElementById('especificarSituacaoContainer'); if (es) es.style.display = 'none';
   const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.display = 'none';
+  const codigoInput = document.getElementById('codigo');
+  const statusCodigo = document.getElementById('statusCodigo');
+  if (codigoInput) codigoInput.value = '';
+  if (statusCodigo) statusCodigo.textContent = '';
+  editToken = null;
   cruzadoId = null;
   cruzadoOriginal = null;
 }

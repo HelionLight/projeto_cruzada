@@ -53,16 +53,20 @@ O que depende de você:
 - fornecer o modelo oficial do termo de consignação em folha para ser colocado na pasta futura;
 - validar o fluxo com alguns testes reais.
 
-### 2.4 Alertas para a secretaria
+### 2.4 Notificações por e-mail e validação de acesso
 
 O que pode ser feito:
-- criar alertas para novos cadastros;
-- criar alertas para alterações importantes, como voluntariado e contribuição;
-- mostrar essas pendências em uma área administrativa.
+- enviar um aviso por e-mail para a secretaria após cada novo cadastro, informando que há cadastros aguardando análise e quantos ainda estão pendentes;
+- criar um fluxo de verificação para atualização de cadastro, no qual o sistema envia um código para o e-mail cadastrado da pessoa quando ela pedir para editar seus dados;
+- pedir que a pessoa informe esse código em uma tela específica para confirmar que é ela mesma e liberar o acesso à página de atualização;
+- enviar um e-mail para o candidato após a análise do cadastro, informando se ele foi aprovado ou recusado;
+- no caso de aprovação, informar o número de cruzado atribuído e deixar preparado o espaço para a futura carteirinha digital;
+- no caso de recusa, informar claramente que o cadastro não foi aprovado e que nenhum número de cruzado foi atribuído.
 
 O que depende de você:
-- decidir se o alerta será por e-mail, WhatsApp, Telegram ou painel interno;
-- definir quem deve receber os alertas.
+- definir o texto final de cada e-mail;
+- confirmar quem deve receber os avisos da secretaria;
+- definir a regra inicial para a numeração dos cruzados, sendo que a sugestão atual é começar em 8000.
 
 ### 2.5 Importação da base antiga
 
@@ -76,7 +80,7 @@ O que depende de você:
 - fornecer a planilha com os dados completos;
 - validar se a importação deve incluir todos os registros antigos ou apenas um subconjunto inicial.
 
-### 2.5 Páginas públicas e links do site
+### 2.6 Páginas públicas e links do site
 
 O que pode ser feito:
 - criar páginas informativas sobre o cadastro;
@@ -87,7 +91,7 @@ O que depende de você:
 - definir os textos oficiais e os links que devem aparecer;
 - confirmar se esses conteúdos serão publicados em outro site ou dentro desta aplicação.
 
-### 2.6 Backup e segurança dos dados
+### 2.7 Backup e segurança dos dados
 
 O que pode ser feito:
 - configurar backup do banco de dados;

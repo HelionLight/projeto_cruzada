@@ -12,7 +12,7 @@
     
     <div id="buscaForm">
       <h2>Verificação de Identidade</h2>
-      <p>Para atualizar seu cadastro, insira seu CPF e Data de Nascimento para verificação:</p>
+      <p>Para atualizar seu cadastro, insira seu CPF e Data de Nascimento:</p>
       
       <label for="cpfBusca">CPF:</label>
       <input type="text" id="cpfBusca" placeholder="000.000.000-00" required>
@@ -21,6 +21,21 @@
       <input type="date" id="dataNascimentoBusca" required>
       
       <button id="buscarBtn">Buscar Cadastro</button>
+
+      <div id="codigoForm" style="display:none; margin-top: 18px;">
+        <h3 style="margin-top: 0;">Confirmação por e-mail</h3>
+        <p>Enviaremos um código para o e-mail cadastrado. Digite o código para liberar a edição.</p>
+
+        <button type="button" id="solicitarCodigoBtn">📩 Enviar código</button>
+
+        <div style="margin-top: 12px;">
+          <label for="codigo">Código recebido:</label>
+          <input type="text" id="codigo" name="codigo" placeholder="00000000" inputmode="numeric" />
+          <button type="button" id="verificarCodigoBtn" style="margin-top: 10px;">✅ Verificar código</button>
+          <p id="statusCodigo" style="margin-top: 10px; color: #666;"></p>
+        </div>
+      </div>
+
       <p style="margin-top: 20px; text-align: center;">
         <a href="index.html" style="color: #3498db; text-decoration: none;">← Voltar para Novo Cadastro</a>
       </p>

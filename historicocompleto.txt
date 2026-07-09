@@ -1,0 +1,1048 @@
+See full task
+
+Listed Recursively
+projeto_cruzada
+• 25 files
+
+
+
+
+
+
+
+
+
+
+
+Análise do projeto (como funciona hoje)
+
+Visão geral
+O repositório projeto_cruzada é uma aplicação web feita com:
+
+Backend: Node.js + Express
+Banco: MongoDB + Mongoose
+Arquivos: upload e armazenamento de documentos/fotos via GridFS
+Autenticação admin: JWT
+Frontend: arquivos estáticos em public/ (HTML/CSS/JS)
+O fluxo central do sistema é: cadastro → temporário (pendente) → revisão/aprovação → move para banco permanente (aprovado) → gestão/edição/exportação.
+
+Estrutura do código
+1) server.js (servidor principal)
+Responsável por:
+
+ler variáveis do .env (dotenv)
+configurar middleware do Express (cors, express.json, urlencoded)
+conectar no MongoDB via mongoose.connect(MONGO_URI)
+registrar as rotas:
+app.use('/api/auth', require('./routes/auth'))
+app.use('/api/cruzados', require('./routes/cruzados'))
+servir o frontend:
+express.static(.../public)
+rota / serve public/index.html
+rota /admin serve public/admin.html
+ter um middleware de erro global (retorna 500)
+2) Rotas de autenticação: routes/auth.js
+Endpoint principal:
+
+POST /api/auth/login
+recebe username e password
+busca User no MongoDB
+valida senha via user.comparePassword
+gera JWT com process.env.JWT_SECRET
+retorna { token }
+3) Middleware de segurança: middleware/auth.js
+Tem dois papéis:
+
+authenticate
+
+lê Authorization: Bearer <token>
+faz jwt.verify
+carrega req.user = User.findById(decoded.id)
+bloqueia com 401 se token inválido
+authorize(...roles)
+
+checa req.user.role estar entre os roles aceitos
+bloqueia com 403 se não tiver permissão
+4) Modelos (MongoDB schemas)
+models/User.js
+username (unique)
+password (hash)
+role (admin/secretario/tesoureiro)
+middleware pre('save') para hash com bcryptjs
+método comparePassword
+models/Cruzado.js
+Schema do cadastro permanente:
+
+dados pessoais e profissionais
+foto, certificadoIndicacao, documentoConsignacao, documentoVoluntario como ObjectId (referências aos arquivos no GridFS)
+status: pendente | aguardando_documentos | aprovado | rejeitado
+Observação importante: a lógica de temporário/aprovado usa também um modelo “temp”.
+
+5) Modelo temporário: models/CruzadoTemp.js
+Eu não li o arquivo ainda, mas pelo uso nas rotas ele é a coleção temporária que recebe cadastros novos com status pendente e depois avança para revisão.
+
+6) Rotas do cadastro/admin: routes/cruzados.js
+Esse arquivo concentra praticamente toda a lógica de negócio.
+
+6.1 Configuração de upload (GridFS + multer)
+usa multer.memoryStorage() (fica em memória)
+limita tamanho do arquivo: 5MB
+define campos:
+foto
+certificadoIndicacao
+documentoVoluntario
+documentoConsignacao
+Quando chega um cadastro, ele salva cada arquivo no GridFS:
+
+getGridFSBucket()
+bucket.openUploadStream(nomeOriginal, { contentType })
+uploadStream.end(buffer)
+guarda o uploadStream.id no Mongo no campo do schema (foto, etc).
+6.2 Envio de e-mail para o secretário (já existe)
+Há uma função enviarAlertaSecretario() que:
+
+habilita/desabilita via EMAIL_ALERT_ENABLED
+cria transportador SMTP via variáveis:
+SMTP_HOST, SMTP_USER, SMTP_PASS, (opcional SMTP_PORT, SMTP_SECURE)
+conta pendentes em CruzadoTemp onde status está em ['pendente','aguardando_documentos']
+envia e-mail para:
+SECRETARIO_EMAIL ou EMAIL_USER ou fallback 'secretaria@cme.org.br'
+E isso acontece dentro da rota de register (após salvar).
+
+6.3 Validação do formulário (Joi)
+cruzadoSchema define campos obrigatórios e enums.
+Ex.: sexo tem que ser masculino|feminino, vinculoProfissional tem lista fechada, etc.
+
+Além disso, há um “sanitizer” que:
+
+remove campos vazios ''
+converte strings "true"/"false" em boolean
+converte valorContribuicao em número
+6.4 POST /api/cruzados/register (cadastro novo)
+Fluxo:
+
+valida schema Joi
+checa duplicidade em CruzadoTemp:
+CPF duplicado → 400
+Email duplicado → 400
+salva arquivos enviados no GridFS (se existirem)
+cria new CruzadoTemp(cruzadoData) e salva
+chama enviarAlertaSecretario()
+responde 201 Registro enviado para aprovação
+6.5 GET /api/cruzados/pending (admin/secretário)
+retorna CruzadoTemp com status: 'pendente', ordenado por createdAt
+6.6 GET /api/cruzados/pending/voluntarios
+retorna temporários com:
+status: 'aguardando_documentos'
+trabalharVoluntario: true
+e documentoVoluntario existente
+6.7 PUT /api/cruzados/:id/status (aprovar/rejeitar)
+Recebe { status: 'aprovado' | 'rejeitado' }
+
+Se aprovado:
+verifica se precisa de revisão documental:
+trabalharVoluntario || documentoConsignacao || documentoVoluntario
+se precisa:
+atualiza temporário para aguardando_documentos
+caso contrário:
+cria new Cruzado({...temp, status:'aprovado'})
+salva no banco permanente
+deleta o registro temp (CruzadoTemp.findByIdAndDelete)
+Se rejeitado:
+marca no temp status:'rejeitado' (não remove na hora)
+comentário indica “será deletado pelo TTL” (TTL precisa existir na coleção/índices)
+6.8 Atualização/edição e exclusão (admin)
+PUT /api/cruzados/:numeroCruzado:
+findOneAndUpdate({numeroCruzado})
+DELETE /api/cruzados/:numeroCruzado:
+deleta permanente por numeroCruzado
+6.9 router.put('/atualizar/:id') (edição pelo usuário)
+Essa rota:
+
+valida dados (Joi)
+busca por id (ObjectId)
+evita duplicidade de CPF/email comparando “CPF sem formatação”
+processa upload de foto, certificadoIndicacao, documentoConsignacao
+atualiza Cruzado com os novos IDs de GridFS
+6.10 Arquivos: GET /api/cruzados/image/:id
+recebe um id de GridFS (24 chars)
+abre stream download do GridFS e faz pipe(res)
+6.11 Consignação e exportação
+GET /api/cruzados/consignacao: lista temporários com consignação + documento
+GET /api/cruzados/export/excel: exporta Cruzado.find({status:'aprovado'}) para XLSX
+6.12 Buscar por CPF
+GET /api/cruzados/buscar?cpf=...
+tenta busca direta (cpf: cpfQuery)
+depois busca por versão sem não-dígitos
+fallback usa $regexReplace (se suportado no Mongo da stack)
+Como o sistema “anda” na prática (fluxo completo)
+Usuário preenche formulário e envia arquivos → POST /register
+Sistema cria registro em CruzadoTemp (pendente) e salva os arquivos no GridFS
+Envia e-mail para a secretaria com quantidade de pendentes
+Secretário entra em /admin, chama API /pending
+Secretário aprova:
+pode mandar para aguardando_documentos ou diretamente mover para Cruzado com status aprovado
+Se aprovado e não precisar documentos → o temp é apagado
+Exportação e edição usam a coleção permanente Cruzado
+Próximo passo (para eu “fechar” a análise com 100% de precisão)
+Ainda faltam para eu compreender tudo antes de qualquer alteração:
+
+models/CruzadoTemp.js
+public/admin*.html/js, public/script.js e as rotas chamadas pelo frontend
+createUser.js e se existe algum seed/admin padrão
+avisosnecessarios.txt (você abriu isso em tab)
+public/atualizar.html, public/editar.js (fluxo de atualização pelo usuário)
+Se você confirmar, eu continuo lendo esses arquivos e depois faço um brainstorm/plan de como o código se relaciona com o comportamento que você quer (email de atualização, email de aprovação/rejeição etc.), sem alterar nada ainda.
+
+
+
+
+
+
+
+O entendimento do projeto já ficou bem sólido: ele funciona como um cadastro com aprovação admin, usando coleção temporária (pendente) até a secretaria decidir, e depois movendo para a coleção permanente (aprovado). Também já existe envio de e-mail para a secretaria no momento do cadastro.
+
+O que já foi analisado (principais peças)
+Backend
+server.js: Express + conexão MongoDB + rotas:
+
+/api/auth (login admin)
+/api/cruzados (toda lógica do cadastro/admin)
+e serve arquivos estáticos de public/.
+routes/auth.js: POST /api/auth/login gera JWT.
+
+middleware/auth.js:
+
+authenticate: valida JWT
+authorize(...roles): libera por req.user.role.
+Modelos
+
+models/Cruzado.js: schema do banco permanente (aprovados).
+models/CruzadoTemp.js: schema do banco temporário com status e expiresAt (TTL ~ 180 dias).
+Ele é salvo na coleção explicitamente chamada temporario.
+routes/cruzados.js (o mais importante):
+
+Upload via multer (memoryStorage) + GridFS (bucketName: 'uploads').
+Validação de formulário via Joi.
+Cadastro:
+POST /api/cruzados/register
+salva em CruzadoTemp com status: 'pendente'
+salva arquivos no GridFS e guarda os IDs no documento
+chama enviarAlertaSecretario()
+Admin:
+GET /api/cruzados/pending (lista pendentes)
+GET /api/cruzados/pending/voluntarios
+PUT /api/cruzados/:id/status (aprovar/rejeitar)
+Usuário:
+PUT /api/cruzados/atualizar/:id (atualiza cadastro permanente)
+GET /api/cruzados/buscar?cpf=...
+Arquivos:
+GET /api/cruzados/image/:id (serve conteúdo do GridFS)
+Exportação:
+GET /api/cruzados/export/excel (xlsx dos aprovados)
+Frontend
+public/admin.html + public/admin.js:
+
+Faz login no painel
+Busca listas com intervalos (auto-refresh a cada 10s)
+Botões chamam PUT /api/cruzados/:id/status
+Botões abrem imagens/documentos via /api/cruzados/image/:id
+Exporta Excel via /api/cruzados/export/excel
+public/script.js:
+
+Lógica do formulário público
+Formata CPF/celular/condicionais
+Submete POST /api/cruzados/register com FormData e upload de arquivos.
+Onde exatamente o e-mail já existe hoje
+No arquivo routes/cruzados.js, dentro de POST /api/cruzados/register, existe a função:
+
+enviarAlertaSecretario()
+Conta pendentes em CruzadoTemp (pendente e aguardando_documentos)
+Usa nodemailer com SMTP via .env
+Envia e-mail para SECRETARIO_EMAIL (ou EMAIL_USER, fallback 'secretaria@cme.org.br')
+✅ Ou seja: aviso 1 (secretário após cada cadastro com quantos pendentes) já está implementado.
+
+O que ainda não existe (ou não vi ainda implementado)
+Com base no que já li:
+
+ainda não vi:
+fluxo de atualização via verificação por e-mail com código (estilo Google)
+e-mails para o candidato quando o cadastro é aprovado ou recusado (3,1 e 3,2)
+lógica de atribuição/controle do próximo número de cruzado (8000...) automaticamente no momento de aprovação
+Esses itens provavelmente precisam ser adicionados no fluxo de:
+
+PUT /api/cruzados/:id/status (aprovar/rejeitar)
+e também em novas rotas/coleções/mecanismos para código de verificação no CPF para atualização.
+Próxima etapa (para eu fechar 100% da compreensão antes de mexer)
+Falta ler estes arquivos para mapear totalmente o fluxo “do usuário” e quais chamadas existem hoje:
+
+public/index.html e public/style.css (para entender os campos/IDs do front)
+public/atualizar.html e public/editar.js (fluxo real do pedido de atualização)
+createUser.js (se cria admin/seeding)
+models/... (já li Cruzado e CruzadoTemp; falta só confirmar completo se há mais algo além disso)
+Se você confirmar, eu faço a leitura desses arquivos e aí monto o brainstorm/plan completo de como implementar exatamente:
+
+verificação por e-mail com código para atualizar (por CPF)
+e-mail de aprovação/recusa com mensagem e preparo do espaço da carteirinha digital
+número de cruzado começando em 8000 com incremento seguro
+
+
+
+
+
+
+
+Task Completed
+Entendi como o projeto “projeto_cruzada” funciona hoje (sem propor alterações ainda).
+
+Backend: Node.js + Express + MongoDB (Mongoose)
+Arquivos: upload via multer (memory) e persistência em GridFS (“uploads”)
+Auth admin: JWT com middleware authenticate/authorize
+Dados:
+CruzadoTemp (coleção temporario) recebe cadastros com status e possui expiresAt (TTL ~180 dias)
+Cruzado é o cadastro permanente após aprovação
+Fluxo principal:
+
+Público envia formulário + uploads → POST /api/cruzados/register.
+Valida com Joi
+Garante unicidade de CPF/email na coleção temporária
+Salva arquivos no GridFS e armazena IDs no documento
+Salva em CruzadoTemp
+Já existe envio de e-mail para o secretário com contagem de pendentes: função enviarAlertaSecretario() dentro de routes/cruzados.js.
+Admin acessa /admin.
+public/admin.js chama:
+GET /api/cruzados/pending
+GET /api/cruzados/pending/voluntarios
+GET /api/cruzados/consignacao
+Aprovar/rejeitar chama PUT /api/cruzados/:id/status.
+Aprovar pode mandar para aguardando_documentos ou mover para Cruzado e deletar do temp.
+Usuário edita cadastro:
+public/atualizar.html + public/editar.js
+Fluxo atual é: buscar por CPF (via GET /api/cruzados/buscar) + checar dataNascimento no frontend; depois atualiza via PUT /api/cruzados/atualizar/:id.
+O que foi confirmado não existir ainda (com base no código lido):
+
+Fluxo de “código por e-mail” para liberar edição (estilo Google)
+E-mails para candidato após aprovação/recusa (3.1 e 3.2)
+Numeração automática de numeroCruzado começando em 8000 no momento da aprovação
+Arquivos-chave que mapeiam o comportamento:
+
+server.js
+routes/auth.js
+middleware/auth.js
+routes/cruzados.js
+models/User.js, models/Cruzado.js, models/CruzadoTemp.js
+public/index.html, public/script.js
+public/admin.html, public/admin.js
+public/atualizar.html, public/editar.js
+Próximo passo natural (quando formos alterar): fazer um plan completo de implementação do fluxo 2 e 3 da sua descrição (código de verificação por e-mail para atualização e e-mails de aprovação/recusa), encaixando no endpoint PUT /api/cruzados/:id/status e criando rotas/coleções para códigos/controle de autorização de atualização.
+
+
+ok então oq eu quero que voce faça por agora é somente é montar o necessario para fazer oque esta nos numeros 2.2 e 2.4 do PLANO_IMPLEMENTACAO_CRUZADA.md e me falar oq eu preciso buscar eu mesmo pra alterar depois. alem disso não preciso que voce rode o código para testar eu farei depois
+
+
+
+
+Plano mínimo para implementar 2.2 (Fluxo de documentos e validação) e 2.4 (Notificações por e-mail e validação de acesso), sem alterar código por enquanto — só o que você precisa criar/checar depois.
+
+2.2 — Fluxo de documentos e validação
+O que já existe no código hoje
+Upload de PDFs já existe (em routes/cruzados.js):
+certificadoIndicacao (PDF)
+documentoVoluntario (PDF)
+documentoConsignacao (PDF)
+O sistema salva tudo no GridFS e guarda os IDs no Mongo.
+Porém, a lógica de “obrigatoriedade” hoje é parcial:
+ao aprovar um cadastro, se trabalharVoluntario || documentoConsignacao || documentoVoluntario, ele vai para aguardando_documentos.
+mas não parece haver uma validação forte de “tamanho/tipo/obrigatório conforme campos marcados” no backend além do Joi básico.
+Necessário você definir (para eu conseguir te orientar com precisão depois)
+Quais documentos são obrigatórios em quais situações (tabela tipo):
+Indicação (sempre? sempre tem certificadoIndicacao?)
+Voluntário: quando trabalharVoluntario = true, documentoVoluntario é obrigatório?
+Consignação em folha: quando consignacao = true, documentoConsignacao é obrigatório?
+Tamanho máximo por documento (hoje é só “5MB por arquivo” no multer global)
+Tipos aceitos no backend (hoje o frontend limita “application/pdf”, mas o backend precisa conferir mimetype/extensão)
+O que acontece com quem aprovar sem documentos:
+vai para aguardando_documentos (já existe)
+e depois como a secretaria “finaliza”? (hoje existe aprovação/rejeição no mesmo endpoint :id/status, mas o fluxo “documental” ainda é mais genérico)
+O que você precisa procurar / mapear para alterar depois
+No backend, você vai mexer principalmente em:
+
+routes/cruzados.js
+função router.post('/register', upload, ...)
+função router.put('/:id/status', authenticate, authorize(...))
+No frontend, para garantir consistência:
+
+public/index.html + public/script.js
+onde já existem campos/inputs de PDF e condicionais
+public/admin.html + public/admin.js
+onde a secretaria visualiza e aprova/rejeita
+Ajustes “essenciais” de validação (checklist)
+Você vai precisar implementar/confirmar:
+
+Validação backend:
+req.files.documentoX existe quando o campo correspondente foi marcado
+req.files.documentoX[0].mimetype === 'application/pdf' (ou equivalente)
+limitar tamanho por documento (pode manter 5MB, mas talvez diferenciar)
+Melhorar validações no momento de aprovação documental:
+quando o temp está em aguardando_documentos, garantir que os documentos exigidos existem antes de mover para permanente (Cruzado).
+2.4 — Notificações por e-mail e validação de acesso (código para atualizar)
+O que já existe hoje
+Existe envio de e-mail para o secretário após cada cadastro:
+enviarAlertaSecretario() dentro de routes/cruzados.js (já identificado)
+O sistema não tem ainda:
+rota para “solicitar código”
+rota para “validar código”
+rota para “permitir atualização” após verificação
+O que você quer implementar (requisitos)
+Para atualização do cadastro:
+Usuário solicita atualização (usando CPF)
+Sistema envia um código no e-mail cadastrado naquele CPF
+Usuário informa o código numa tela
+Só após isso libera o acesso à página de atualização
+Para aprovação/recusa pelo admin:
+Após aprovado (com número começando em 8000 no primeiro aceito):
+enviar e-mail “aprovado”
+incluir espaço para carteirinha digital
+Após rejeitado:
+enviar e-mail “recusado”
+garantir que não atribui número (e não incrementa contador)
+O que você precisa criar/ajustar depois (componentes necessários)
+Uma “tabela/coleção” para código de verificação (não existe hoje):
+Ex.: EmailVerificationToken com campos como:
+cpf (ou userId)
+token (código)
+expiresAt
+usedAt / status
+Rotas no backend:
+POST /api/auth/email-verification/request (gera código, envia e-mail)
+POST /api/auth/email-verification/verify (valida código)
+e/ou um mecanismo para “liberar” atualização (ex.: cookie/nonce JWT temporário)
+Frontend:
+nova tela (HTML/JS) para entrar o código
+ajuste em public/atualizar.html + public/editar.js para:
+ao invés de liberar edição direto, exigir verificação
+E-mails candidatos (após admin):
+implementar disparo dentro de PUT /api/cruzados/:id/status quando status virar aprovado ou rejeitado
+Necessário você definir (para eu orientar o desenho certinho depois)
+Como o usuário “solicita atualização” hoje:
+ele já consegue buscar pelo CPF + dataNascimento (public/atualizar.html)
+você quer trocar isso para ficar só com “CPF => código por e-mail” ou manter dataNascimento + código?
+Validade do código:
+5 min? 15 min? 1h?
+Tentativas:
+pode errar 3 vezes?
+Quem emite:
+“só pelo e-mail cadastrado no banco”
+A aprovação/recusa:
+texto exato do e-mail (assunto e conteúdo)
+O que você precisa procurar / mapear no código para alterar depois
+Backend:
+routes/cruzados.js
+onde hoje envia apenas para o secretário (enviarAlertaSecretario)
+e onde muda status de pendente para aprovado/rejeitado
+Models:
+hoje só vi Cruzado e CruzadoTemp e User
+você vai precisar criar um modelo/coleção para tokens/códigos
+Frontend:
+public/atualizar.html e public/editar.js
+atualmente a “verificação” é feita por CPF + dataNascimento (no frontend)
+você vai precisar alterar para a verificação por código
+Ajuste no admin para e-mail candidato:
+public/admin.js só chama a API; o envio do e-mail deve ser no backend.
+O que vou precisar “pegar de você” para eu te guiar na alteração depois (sem código agora)
+Você já me disse o texto geral dos avisos, então falta só decidir estes pontos:
+
+Para 2.2 (documentos)
+Confirmar quais documentos são obrigatórios em cada cenário:
+Indicação (certificadoIndicacao): obrigatório sempre?
+Voluntário: obrigatório se trabalharVoluntario=true?
+Consignação: obrigatório se consignacao=true?
+Para 2.4 (verificação por código)
+Atualização do cadastro:
+o usuário deve ser autenticado por CPF + dataNascimento + código, ou apenas código via e-mail?
+Validade do código (minutos) e limites de tentativa.
+Assim que você confirmar esses itens, eu monto exatamente:
+
+quais rotas/coleções criar
+onde inserir os gatilhos dos e-mails (aprovado/recusado)
+e como encaixar o fluxo no frontend atual de atualizar.html.
+
+Task Completed
+Entendido. Segue o “necessário para implementar” 2.2 e 2.4 do PLANO_IMPLEMENTACAO_CRUZADA.md, e o que você precisa levantar para depois eu te orientar/ajustar no código.
+
+2.2 — Fluxo de documentos e validação (o que precisa existir/ser ajustado)
+Onde isso está hoje
+Backend já salva PDFs no GridFS: routes/cruzados.js (campos certificadoIndicacao, documentoVoluntario, documentoConsignacao).
+Aprovação já “separa” fluxo documental: em PUT /api/cruzados/:id/status, se trabalharVoluntario || documentoConsignacao || documentoVoluntario manda para status: 'aguardando_documentos'.
+O que falta para ficar correto (checklist)
+Definir regras de obrigatoriedade (tabela de negócio) e implementá-las no backend.
+Indicação: certificadoIndicacao é obrigatório sempre?
+Voluntário: se trabalharVoluntario=true então documentoVoluntario é obrigatório.
+Consignação: se consignacao=true então documentoConsignacao é obrigatório.
+Validação no upload (backend, não só frontend):
+checar req.files para garantir que o arquivo veio quando a regra diz que é obrigatório;
+validar mimetype/extensão = PDF;
+manter/ajustar limite de tamanho (hoje está global em 5MB no multer).
+Validação no momento da aprovação documental (quando status vai para permanente/aprovado final):
+se o cadastro foi para aguardando_documentos, garantir que os documentos exigidos existem antes de mover para Cruzado.
+Arquivos que você vai precisar buscar/alterar depois
+routes/cruzados.js
+router.post('/register'...) (validação e obrigatório por campos)
+router.put('/:id/status'...) (aprovar → verificar documentos exigidos antes de mover)
+(provavelmente) models/CruzadoTemp.js e models/Cruzado.js (se quiser registrar campos de auditoria/flags sobre documentos)
+Frontend apenas como suporte:
+public/index.html, public/script.js (quais campos aparecem/obrigatoriedade no UX)
+public/admin.html, public/admin.js (como a secretaria revisa/decide)
+2.4 — Notificações por e-mail e validação de acesso (o que precisa existir)
+Onde já existe hoje
+Backend já envia e-mail para secretário após cadastro: enviarAlertaSecretario() dentro de routes/cruzados.js.
+O que falta para cumprir 2.4
+Para “código por e-mail estilo Google” para liberar atualização:
+
+Gerar código/token e armazenar (coleção de tokens)
+você vai precisar criar um model/coleção tipo EmailVerificationToken (ex.: cpf/userId, token, expiresAt, usedAt).
+Rota para solicitar código
+recebe CPF (e talvez dataNascimento ou só CPF) e envia código para o e-mail daquele CPF.
+Rota para validar código
+compara token + expiração + tentativas; marca como usado.
+Liberação de acesso à edição
+após validar código, liberar uma forma segura de autorizar a chamada PUT /api/cruzados/atualizar/:id.
+normalmente isso vira: JWT temporário / sessão / nonce que expira em minutos.
+Para e-mails do candidato (aprovado/recusado):
+5) Disparar e-mail quando o admin muda status
+
+dentro de PUT /api/cruzados/:id/status:
+ao entrar em aprovado: enviar e-mail com número de cruzado e espaço para carteirinha
+ao entrar em rejeitado: enviar e-mail de recusa deixando claro que não terá número
+Numeração de cruzado começando em 8000
+precisa de uma regra segura para atribuir “o próximo número” (ideal: contador no banco ou calcular o maior número e somar 1, com cuidado de concorrência).
+Arquivos que você vai precisar buscar/alterar depois
+routes/cruzados.js
+PUT /api/cruzados/:id/status (gatilhos dos e-mails 3.1/3.2 + número 8000)
+public/atualizar.html + public/editar.js
+hoje a validação é CPF + dataNascimento no frontend; isso precisa ser substituído por fluxo “solicitar código → digitar código → liberar edição”.
+(novo) modelos/coleções para tokens
+você vai precisar criar um arquivo em models/ (ex.: EmailVerificationToken.js).
+(novo) rotas para solicitar/validar código
+pode ser dentro de routes/auth.js ou nova rota dedicada.
+O que você precisa “buscar” agora para eu te orientar exatamente (sem mexer no código)
+Responda/decida estes itens:
+
+Docs obrigatórios (2.2):
+certificadoIndicacao é obrigatório sempre?
+documentoVoluntario é obrigatório quando trabalharVoluntario=true?
+documentoConsignacao é obrigatório quando consignacao=true?
+Fluxo de verificação (2.4):
+Para pedir o código, usa só CPF ou CPF + dataNascimento?
+Código vale por quantos minutos?
+Quantas tentativas máximas antes de expirar/bloquear?
+A atualização deve ser permitida via JWT temporário (recomendado) ou outro mecanismo?
+E-mails do candidato (3.1/3.2, dentro de 2.4):
+confirmar remetente “from” e assunto/título do e-mail (se já existe padrão em .env).
+confirmar se o “espaço da carteirinha digital” vai ser link futuro ou texto placeholder.
+Com essas respostas, eu consigo montar um blueprint fechado (quais rotas/coleções/checagens exatamente) para você depois implementar no código.
+
+
+ok então respondendo as perguntas eu falarei em ordem sim ou não e se necessario explicação: 1- docs obrigatorios: sim, sim, sim, e a verificação da presença deles deve ser feita antes de enviar o cadastro                      2- Fluxo de verificação: só CPF, 10 minutos mas é de uso unico, por enquanto infinitas mas depois verificarei com o cliente e alteramos, pode utilizar o jwt se for a melhor opção e se o tempo infinito for problema pra usar ele coloque o tempo maximo do jwt ao inves do infinito                                                              3-E-mails do candidato: o .env veremos depois faça o resto antes porfavor
+
+
+Plano (apenas blueprint + o que você precisa ajustar depois no código) para cumprir 2.2 e 2.4 conforme suas respostas.
+
+2.2 — Fluxo de documentos e validação
+Regras finais (negócio):
+
+Indicação: certificadoIndicacao obrigatório sempre
+Voluntário: documentoVoluntario obrigatório se trabalharVoluntario === true
+Consignação: documentoConsignacao obrigatório se consignacao === true
+“Verificação de presença antes de enviar o cadastro”: essa checagem deve ocorrer no backend dentro de POST /api/cruzados/register, antes de salvar no Mongo/Temp.
+O que você vai precisar implementar/ajustar depois (pontos exatos):
+
+routes/cruzados.js em router.post('/register', upload, ...)
+Depois de sanitize(req.body) e Joi.validate, fazer checagem de arquivos:
+certificadoIndicacao existe em req.files e tem arquivo
+se req.body.trabalharVoluntario === true então documentoVoluntario existe
+se req.body.consignacao === true então documentoConsignacao existe
+Se faltar, retornar 400 com mensagem clara (ex.: “Documento do voluntariado é obrigatório…”).
+Validação de tipo/tamanho (recomendado mesmo já existindo upload global):
+Validar mimetype === 'application/pdf' para os 3 PDFs obrigatórios
+manter limite 5MB (ou diferenciar depois se quiser)
+Obs.: hoje seu código de aprovação documental já manda para status: 'aguardando_documentos' se houver trabalharVoluntario || documentoConsignacao || documentoVoluntario, mas isso não garante “obrigatório”; com a regra acima, a ausência deve impedir o cadastro de entrar no sistema.
+
+2.4 — Notificações por e-mail e validação de acesso (código por CPF)
+Regras finais (negócio):
+
+Código é enviado por e-mail cadastrado no banco do CPF (ou seja, buscar Cruzado por CPF e pegar o email).
+Código único por uso (1 use only)
+Validade do código: 10 minutos
+Por enquanto: tentativas “infinitas” até expirar, mas você pode trocar depois.
+“Pode usar JWT”:
+Use um JWT com expiração em 10 minutos e que seja marcado como usado (para ser “uso único”).
+O que você precisa criar no código depois (estrutura mínima)
+
+A) Model para tokens/códigos
+Criar algo como models/EmailVerificationToken.js com:
+cpf (string)
+tokenId ou jti (string) (armazenar o identificador do token)
+expiresAt (Date) (opcional TTL no Mongo)
+usedAt (Date nullable)
+Motivo: JWT expira, mas para “uso único” você marca usedAt no primeiro uso.
+
+B) Rotas para o fluxo de atualização
+Você precisa de pelo menos 2 rotas novas:
+
+Solicitar código
+POST /api/auth/email-verification/request
+Entrada: { cpf }
+Backend:
+normalizar CPF (remover não-dígitos)
+buscar cadastro permanente (Cruzado) pelo CPF limpo (ou por estratégia atual do seu GET /buscar)
+pegar o email do documento
+gerar JWT com exp = 10m, contendo cpf e um jti/id único
+persistir no model EmailVerificationToken com cpf, tokenId=jti, expiresAt
+enviar e-mail com o código para o email do usuário
+Validar código
+POST /api/auth/email-verification/verify
+Entrada: { cpf, code, token } (você escolhe a forma; existem duas abordagens):
+Abordagem recomendada (mais segura e simples):
+você gera JWT que carrega o jti
+no formulário o usuário digita apenas o “código”
+o backend valida o “código” comparando com o tokenId/jti (você pode usar o jti como o “código”)
+Após valida:
+verificar se existe no banco
+verificar expiresAt >= now
+verificar usedAt == null
+marcar usedAt = now
+liberar acesso à atualização: retornar um JWT temporário de edição (ex.: editToken exp 10m ou até a próxima validação)
+C) Proteger a edição
+Hoje a edição é:
+
+PUT /api/cruzados/atualizar/:id (sem autenticação)
+Para cumprir 2.4, você precisa:
+
+adicionar autenticação para essa rota (ou uma validação via token temporário)
+exigir que o usuário esteja com editToken válido
+e opcionalmente garantir que editToken.cpf bate com o CPF do :id (segurança)
+Arquivos/trechos que você vai precisar mexer depois:
+
+routes/cruzados.js
+adicionar verificação na rota PUT /api/cruzados/atualizar/:id (ou criar uma rota nova só pra “atualização verificada”)
+public/atualizar.html + public/editar.js
+trocar o fluxo atual (CPF + dataNascimento) para:
+solicitar código usando CPF
+mostrar campo “digite o código”
+ao validar, habilitar o formulário de edição
+E-mails do candidato (sem mexer em .env agora)
+Você pediu “o resto antes”, e já defini o gatilho técnico. O envio em si vai depender do seu SMTP (.env), mas o gatilho de quando enviar fica no backend:
+
+No PUT /api/cruzados/:id/status:
+quando status === 'aprovado':
+atribuir numeroCruzado começando em 8000 (regra do próximo número)
+enviar e-mail (mensagem 3,1) para o email do cadastro aprovado
+incluir placeholder “espaço da carteirinha digital”
+quando status === 'rejeitado':
+enviar e-mail (mensagem 3,2) para o email
+garantir que não atribui numeroCruzado
+O “número 8000” e incremento exige cuidado contra concorrência:
+
+regra recomendada: criar contador no banco (coleção CruzadoCounter) com findOneAndUpdate({$inc:{...}}) atômico.
+O que você precisa “buscar” agora (para eu conseguir ajustar depois com precisão)
+Para eu te orientar no código quando for hora de implementar, você precisa me apontar/confirmar 2 coisas sobre o que já existe:
+
+Onde o campo numeroCruzado hoje é definido no fluxo de aprovação
+
+no código atual eu vi que numeroCruzado existe no schema, mas ainda não vi a atribuição automática no PUT /api/cruzados/:id/status.
+então: atualmente ele é atribuído manualmente no admin (provável) ou não é atribuído?
+Como o sistema identifica “CPF no banco” quando vem formatado
+
+seu GET /buscar tenta várias formas (inclui uma parte com $regexReplace)
+para o envio de código “somente CPF”, você quer que o request aceite CPF com pontos/traços e normaliza sempre.
+Quando você implementar, eu consigo depois te passar o passo-a-passo exato com quais trechos mudar e quais campos validar/armazenar em cada rota.
+
+
+Task Completed
+Blueprint montado para cumprir exatamente 2.2 e 2.4 do PLANO_IMPLEMENTACAO_CRUZADA.md, com as regras que você confirmou (docs obrigatórios sempre conforme campos; código único por uso com expiração de 10 min; usar JWT se possível; e-mails de candidato disparados no approve/reject; número inicial 8000 exigindo contador atômico).
+
+O que você precisa buscar/definir depois para eu te orientar a alterar o código com precisão:
+
+Como o sistema hoje atribui numeroCruzado (é manual no admin? não existe atribuição?)
+Como normalizar CPF no fluxo de “solicitar código por CPF” (aceita CPF formatado e normaliza sempre?)
+
+ok no caso numero de cruzado por agora nao tem atribuição então preciso que crie uma automatica após o cadastro ser aceito em todas as partes na pagina do admin, e no cpf Sim, aceita formatado e normaliza sempre! Vamos permitir entrada flexível para facilitar a vida do usuário e limpamos os caracteres não numéricos no código
+
+
+
+
+
+Blueprint fechado para cumprir o que você pediu agora (sem alterar código ainda): 2.2, 2.4 + numeração automática começando em 8000 e normalização flexível de CPF.
+
+2.2 — Fluxo de documentos e validação (docs obrigatórios sempre)
+Implementação deve acontecer antes de salvar o cadastro em:
+
+routes/cruzados.js → router.post('/register', upload, ...)
+Regras (backend)
+Após sanitize(req.body) e depois do Joi (ou antes do Joi, mas depois do sanitize), validar:
+
+certificadoIndicacao obrigatório sempre
+condição: req.files tem certificadoIndicacao e req.files.certificadoIndicacao[0] existe
+documentoVoluntario obrigatório se trabalharVoluntario === true
+condição: se req.body.trabalharVoluntario === true então req.files.documentoVoluntario[0] existe
+documentoConsignacao obrigatório se consignacao === true
+condição: se req.body.consignacao === true então req.files.documentoConsignacao[0] existe
+Também importante (validação de tipo)
+Além da presença:
+
+validar mimetype dos 3 PDFs obrigatórios como application/pdf
+(opcional) manter limite atual de 5MB por arquivo (já está no multer)
+Se faltar qualquer documento, responder 400 antes de criar CruzadoTemp.
+
+2.4 — Código por e-mail (CPF apenas) + acesso liberado por JWT
+Como você confirmou:
+
+entrada CPF “flexível” (formatado ou não) → normalizar removendo não-dígitos
+código único, 10 minutos, expirando
+por enquanto “infinitas tentativas” até expirar (depois ajusta com cliente)
+usar JWT “se for a melhor opção”
+“limpar caracteres não numéricos no código” (na prática: normalizar CPF e também normalizar o code recebido, se vier com espaços/traços)
+O que você vai adicionar/alterar
+A) Criar coleção/model para tokens/códigos (1 use only)
+Novo arquivo em models/:
+
+models/EmailVerificationToken.js
+Campos mínimos sugeridos:
+
+cpf (string, já salva normalizada só com dígitos)
+jti ou tokenId (string) para amarrar ao JWT gerado
+expiresAt (Date)
+usedAt (Date/null)
+Mesmo que o JWT expire, isso permite garantir uso único.
+
+B) Rotas novas para o fluxo de atualização
+Você vai criar (ou adicionar em routes/auth.js / nova rota):
+
+Solicitar código
+POST /api/auth/email-verification/request
+body: { cpf }
+backend:
+normaliza CPF: cpf.replace(/\D/g,'')
+busca o cadastro (coleção permanente): Cruzado.findOne({ cpf: <cpfNormalizado> })
+(se seu banco guardar com formatação, então você pode reaproveitar a estratégia do seu GET /buscar por fallback; mas você disse que normaliza sempre, então ideal é salvar no formato “só dígitos”)
+gera código de forma compatível com JWT:
+opção 1 (simples): usar um valor aleatório como code e guardar no DB
+opção 2 (JWT amarrado): gerar token JWT com jti e mandar esse jti como “código”
+envia e-mail para cruzado.email
+salva em EmailVerificationToken com expiresAt e usedAt=null
+Validar código
+POST /api/auth/email-verification/verify
+body: { cpf, code } (ou { cpf, code, token } se você preferir mandar token também)
+backend:
+normaliza CPF
+busca o token no DB por cpf + “código/identifier”
+checa:
+ainda não expirou
+usedAt == null
+marca usedAt = new Date()
+retorna um JWT de autorização temporária para editar
+expiração: 10 minutos (pelo menos igual ao token)
+payload com cpf e scope: 'edit'
+C) Proteger a rota de atualização atual
+Hoje:
+
+PUT /api/cruzados/atualizar/:id está sem autenticação
+Você precisa:
+
+exigir Authorization: Bearer <token>
+confirmar que o token tem permissão de editar
+opcionalmente confirmar que o cpf do token bate com o CPF do cadastro ou com o :id (recomendado)
+Assim cumprir a “validação de acesso” da 2.4.
+
+D) Ajustar o frontend de atualização
+public/atualizar.html
+public/editar.js
+Hoje o fluxo é “CPF + dataNascimento” e depois chama diretamente PUT.
+Depois precisa virar:
+
+tela 1: solicitar código (CPF)
+tela 2: digitar código
+só então permitir envio do formulário de PUT
+E-mails do candidato + numeração automática 8000 (gatilho no admin)
+Você pediu para criar numeração automática após o cadastro ser aceito no admin, em todas as partes na página do admin.
+
+O lugar certo de disparo é:
+
+routes/cruzados.js → router.put('/:id/status', ...)
+Regras
+Quando status === 'aprovado' e NÃO vai para aguardando_documentos (ou seja, mover pra permanente):
+
+atribuir numeroCruzado automaticamente:
+começar em 8000
+incrementar por 1 para cada novo aprovado finalizado
+salvar no registro permanente (new Cruzado({...}))
+enviar e-mail:
+aprovado: incluir numeroCruzado e placeholder “carteirinha digital”
+rejeitado: enviar e-mail de recusa e garantir que não atribui número
+Como fazer numeração sem colisões
+Você precisa de contador atômico, por exemplo:
+
+novo model CruzadoCounter com nextNumero
+e no approve final usar findOneAndUpdate({ _id:'cruzado' }, { $inc:{nextNumero:1}}, { upsert:true, new:true })
+e então definir numeroCruzado = valor_atual
+(sem esse cuidado, múltiplas aprovações simultâneas podem gerar número duplicado)
+
+Resumo do que você terá que “buscar/confirmar” antes de alterar código
+Como você já confirmou as decisões principais, só falta checar estes pontos operacionais:
+
+CPF no banco: está sendo salvo como digitado (com pontos/traços) ou como “só dígitos”?
+porque seu GET /buscar tenta vários formatos; mas para o fluxo do código “normalizar sempre” funcionar bem, ideal é que o schema grave sempre o CPF limpo.
+Onde você quer exibir numeroCruzado no admin:
+hoje admin.js já mostra voluntario.numeroCruzado || '-', mas no “pendente normal” a tabela não mostra número.
+você quer que apareça também na tabela principal? (isso influencia alteração no frontend, mas não no backend da numeração)
+Se essas duas estiverem claras, o restante fica direto.
+
+
+Task Completed
+Blueprint fechado entregue: (1) 2.2 — validar presença dos 3 PDFs obrigatórios no backend antes de salvar (certificadoIndicação sempre; documento voluntário se trabalharVoluntario; consignação se consignacao); (2) 2.4 — fluxo de atualização por código único por e-mail via CPF normalizado, código com expiração 10 min, uso único via coleção de tokens + JWT temporário para autorizar PUT /atualizar; (3) numeração automática começando em 8000 após aprovação final no admin, com contador atômico, e gatilhos de e-mail aprovado/recusado dentro de PUT /:id/status.
+
+O que ainda precisa ser “buscado/confirmado” antes de alterar o código (2 itens):
+
+formato de CPF persistido no banco (só dígitos vs formatado), para o fluxo de normalização funcionar sem fallback;
+onde você quer exibir numeroCruzado no admin (tabela voluntários e consignação já usam, mas a tabela de pendentes principais hoje pode não mostrar).
+Não executei testes, nem rodei comandos; o plano é só orientação técnica para alteração posterior.
+
+
+no banco de dados tem os dois e aceita os dois porem quando for feito qualquer chamada do cpf ele deve aparecer formatado assim por exemplo (123.456.789-00) lembrando que todos os numeros podem ser diferentes, agora o numero cruzado não aparece pq ele só é entregue após  o cadastro ser aceito por completo e ele ir para a parte de cruzados e sair do temporario no banco de dados
+
+
+Atualização do blueprint com a regra nova do CPF (formatar sempre) e com a confirmação sobre quando numeroCruzado passa a existir.
+
+CPF: manter no banco “formatado”, mas usar “normalizado” para consulta e tokens (2.4)
+Você disse: o banco aceita CPF com e sem formatação, porém quando alguém consultar/usar qualquer chamada com CPF ele deve aparecer formatado (ex.: 123.456.789-00).
+Então o desenho correto para o fluxo de código é:
+Regra técnica
+Persistência: quando gravar/atualizar CPF (em cadastro ou edição), guardar no formato XXX.XXX.XXX-XX.
+Consulta (para buscar token e liberar edição): normalizar internamente com replace(/\D/g,'') para comparar contra o CPF normalizado.
+Formato para respostas: ao retornar CPF para o frontend, formatar novamente.
+O que isso muda no blueprint
+No POST /email-verification/request:
+normalizar CPF do body
+buscar pelo CPF mesmo que esteja formatado no banco (usando o fallback de normalização que seu GET /buscar já faz, ou replicando lógica)
+obter o email
+No PUT /atualizar/:id (após validação por token):
+garantir que o CPF do payload (se existir) volte a ser salvo formatado
+Resumo: seu frontend pode mandar CPF com pontos/traços; o backend deve sempre “limpar pra lógica” e “formatar pra guardar/retornar”.
+
+numeroCruzado: só existe após cadastro “aprovado por completo” (sair do temporário)
+Você confirmou:
+
+numeroCruzado só deve aparecer quando o cadastro sai do temporário e entra na coleção Cruzado (pós aprovação final).
+Então o gatilho de atribuição e e-mail (3.1/3.2) deve rodar somente quando:
+o status vira aprovado e o fluxo não cai em aguardando_documentos (ou seja, a lógica atual do backend segue para mover para a coleção permanente new Cruzado(...)).
+Onde exatamente no código (gatilho)
+No PUT /api/cruzados/:id/status, no bloco:
+if (status === 'aprovado') { ...
+após o trecho que cria permanentCruzado = new Cruzado({...}), salva e faz CruzadoTemp.findByIdAndDelete
+Nesse ponto você:
+atribui numeroCruzado (contador iniciando em 8000 e atômico)
+dispara o e-mail 3.1 (aprovado) com:
+número atribuído
+placeholder para carteirinha digital
+se for rejeitado, dispara e-mail 3.2 (recusa) e não atribui número
+O que você precisa “ajustar/checar” depois (para eu orientar a implementação final)
+Sem rodar código, só para deixar o desenho consistente, você precisa me confirmar 1 item operacional:
+
+Quando o cadastro sai do temporário, hoje o sistema sempre grava cpf formatado automaticamente (ou hoje ele grava exatamente como veio do formulário)?
+Se não grava formatado automaticamente, então a gente precisa padronizar onde “formatar CPF” ao salvar (cadastro e atualização).
+Se você confirmar isso, o plano fica totalmente fechado para o desenvolvimento dos itens 2.2 e 2.4 + numeração 8000 e e-mails 3.1/3.2.
+
+
+Task Completed
+Atualizei o blueprint considerando:
+
+CPF: guardar/retornar formatado (ex: 123.456.789-00), mas para lógica de busca/validação de código normalizar internamente (remover não-dígitos).
+numeroCruzado: só atribuir e enviar e-mail (3.1/3.2) no momento em que o cadastro sai do CruzadoTemp e entra em Cruzado (aprovação final), nunca durante aguardando_documentos.
+Única coisa que falta você confirmar para eu fechar 100% o desenho de implementação:
+
+hoje o backend já grava CPF formatado automaticamente no Cruzado/CruzadoTemp, ou ele salva exatamente como veio do formulário?
+
+acho que salva exatamente como veio só modifca quando chamado
+
+
+Com base no seu feedback (“salva exatamente como veio só modifica quando chamado”), o ajuste final do blueprint fica assim:
+
+CPF (2.4): regra de implementação
+Normalizar sempre para lógica (busca de cadastro por CPF, geração/validação de token):
+cpfNormalizado = cpf.replace(/\D/g,'')
+Formatar para persistir e exibir:
+antes de salvar cpf em CruzadoTemp/Cruzado (no cadastro) e antes de salvar em PUT /api/cruzados/atualizar/:id (na atualização), converter para XXX.XXX.XXX-XX.
+Respostas para o frontend:
+GET /api/cruzados/buscar já retornará o CPF formatado se estiver salvo formatado.
+numeroCruzado + e-mails (3.1/3.2) (dentro de 2.4)
+Atribuir numeroCruzado e disparar:
+e-mail 3.1 (aprovado) SOMENTE quando a rota PUT /api/cruzados/:id/status:
+receber status: 'aprovado'
+não cair no caminho de aguardando_documentos
+e efetivamente mover para Cruzado (salvar permanentemente e deletar do temp)
+e-mail 3.2 (recusado) quando status: 'rejeitado' (sem atribuir número)
+Confirmação final do que você precisa “buscar” / checar depois para eu orientar a mexer no código
+Você vai implementar/ajustar estas duas áreas:
+Padronização de CPF formatado no backend (onde quer que “modifica quando chamado”):
+ao cadastrar (no POST /api/cruzados/register)
+ao atualizar (no PUT /api/cruzados/atualizar/:id)
+ao buscar (garantir que a busca usa normalização)
+Atribuição 8000 + incremento atômico + e-mail no bloco exato da aprovação final em PUT /api/cruzados/:id/status.
+Nada mais depende de você para fechar o blueprint; a partir daqui, a próxima etapa seria eu transformar isso em “passo-a-passo de edições” no código (arquivos/tipos de trechos) quando você pedir para começar a implementação.
+
+
+Task Completed
+Blueprint final consolidado (2.2 + 2.4) + ajustes de CPF e numeração 8000 (sem mudar código ainda).
+
+2.2 — Fluxo de documentos (docs obrigatórios + presença antes de enviar)
+
+Implementar a checagem obrigatória no backend dentro de POST /api/cruzados/register, antes de salvar em CruzadoTemp.
+Regras:
+certificadoIndicacao: obrigatório sempre (req.files.certificadoIndicacao[0] deve existir)
+documentoVoluntario: obrigatório se trabalharVoluntario === true (req.files.documentoVoluntario[0] deve existir)
+documentoConsignacao: obrigatório se consignacao === true (req.files.documentoConsignacao[0] deve existir)
+Reforçar também no backend validação de mimetype/pdf (além do multer global).
+2.4 — Notificações + validação de acesso (código único por e-mail, via CPF)
+
+Código único, 10 minutos, uso único.
+Entrada flexível de CPF: usuário pode digitar formatado; backend normaliza com replace(/\D/g,'') para lógica.
+JWT para liberar atualização: após validar código, devolver JWT temporário (com expiração <= 10min) e proteger PUT /api/cruzados/atualizar/:id.
+Necessário criar modelo/coleção de tokens (ex.: EmailVerificationToken) para garantir uso único (usedAt).
+numeração 8000 + e-mails do candidato (3.1/3.2) — gatilho no admin
+
+Atribuir numeroCruzado e disparar e-mail somente quando o cadastro é aprovado “de verdade”, ou seja, quando o fluxo move do CruzadoTemp para Cruzado (status 'aprovado' e sem cair em aguardando_documentos).
+Regra: primeiro aprovado recebe 8000; incremento por 1 com contador atômico (para evitar colisão).
+Rejeitado dispara e-mail 3.2 e não atribui numeroCruzado.
+CPF “formatado” quando for a chamada (persistência/retorno)
+
+Você confirmou que o sistema salva CPF exatamente como veio e “só modifica quando chamado”. Então:
+ajustar as rotas que participam do fluxo de código/validação e atualização (solicitar/validar/autorizar; e PUT /atualizar) para normalizar logicamente e formatar quando for persistir/retornar.
+Não rodei testes nem executei comandos (apenas blueprint).
+
+
+ok ae e se der tambem coloque para deletar o cadastro se o cadastro for recusado pelo admin
+
+
+Task Completed
+Atualização final do blueprint adicionando a regra de deleção no caso de recusa.
+
+Mudança aplicada ao 2.2/2.4 + fluxo admin (approve/reject)
+
+Hoje o sistema marca CruzadoTemp como 'rejeitado' e comenta que será deletado pelo TTL.
+Para cumprir seu pedido (“se der também coloque para deletar o cadastro se o cadastro for recusado”):
+Alterar a lógica do PUT /api/cruzados/:id/status quando status === 'rejeitado' para:
+apagar imediatamente o registro da coleção temporária (CruzadoTemp.findByIdAndDelete(req.params.id))
+(opcional) antes disso disparar o e-mail de recusa 3.2, usando dados do temp (para não perder dados).
+Atenção de ordem (para não perder e-mail):
+
+Buscar tempCruzado, montar e-mail, enviar, e só então deletar.
+Mantém todo o resto:
+
+numeroCruzado (8000) e e-mail 3.1 somente quando move para Cruzado (aprovação final).
+código de atualização (2.4) e docs obrigatórios (2.2) conforme descrito antes.
+
+sim esta tudo correto pode começar a atualizar tudo
+
+
+
+
+Task Completed
+Iniciei a etapa de implementação criando TODO.md com os passos numerados (2.2, 2.4, proteção de atualização, e-mails 3.1/3.2, numeração 8000 atômica, deleção do temp na recusa e ajuste do frontend).
+
+Próxima ação: vou começar a aplicar as mudanças no código seguindo o TODO (primeiro 2.2 e 2.4 no backend, depois proteção de PUT/rotas, depois admin/número/e-mails, e por fim o frontend).
+
+
+pode fazer as implementações
+
+
+
+
+As implementações começaram.
+
+✅ Criei models/EmailVerificationToken.js (coleção para tokens/códigos de verificação).
+⚠️ Fiz uma alteração no arquivo routes/cruzados.js apenas para re-edição no início (troca de string “const enviarAlertaSecretario = async () => {”).
+O diff do tool mostrou um re-empacotamento grande do arquivo (parece que o arquivo foi regravado/reescrito inteiro pelo editor), mas ainda assim o conteúdo aparenta ter sido mantido.
+Antes de continuar com mais mudanças (2.2/2.4, numeração 8000, e-mails e deleção na rejeição), eu preciso que você valide se routes/cruzados.js continua funcional/sem alterações sem intenção.
+
+Para confirmar:
+
+Abra routes/cruzados.js no VSCode e me diga se não ficou nada “quebrado” (ex.: linhas duplicadas, partes faltando, ou erro de sintaxe).
+Confirme se o servidor ainda inicia com npm start (sem precisar ver logs; só “subiu” ou “deu erro”).
+Assim que você confirmar, eu sigo aplicando o restante do TODO (documentos obrigatórios, rota/validação do código por e-mail com JWT temporário, proteção do PUT atualizar, contador 8000 atômico, e-mails 3.1/3.2 e delete imediato do temp na rejeição).
+
+
+
+routes/cruzados.js está íntegro e com sintaxe válida (não parece que faltou nenhum bloco/funcionalidade; a estrutura e endpoints continuam existindo).
+
+O que eu encontrei (para você saber antes de eu continuar):
+
+Ainda não tem a implementação de 2.2/2.4 (documentos obrigatórios “antes de enviar” e nem o fluxo por código/email).
+O trecho de rejeição ainda está “marcando como rejeitado” (não deletando imediatamente do temp).
+Próxima etapa (vai começar agora):
+
+Implementar 2.2: checar presença dos 3 PDFs obrigatórios no POST /api/cruzados/register antes de salvar.
+Implementar 2.4: criar as rotas de request/verify, gerar JWT temporário de edição e proteger PUT /api/cruzados/atualizar/:id.
+Implementar deleção imediata na recusa (conforme seu pedido).
+Depois disso entro na parte de numeroCruzado 8000 + e-mails 3.1/3.2 e por fim ajustar o frontend de atualização.
+Vou continuar pela ordem do TODO (documentos + código + deleção).
+
+
+
+
+Task Completed
+Implementação iniciada com sucesso (Etapa 2.2 parcial).
+
+Feito:
+
+routes/cruzados.js (POST /api/cruzados/register)
+Adicionei as checagens de documentos obrigatórios antes de salvar em CruzadoTemp:
+certificadoIndicacao obrigatório sempre
+documentoVoluntario obrigatório quando trabalharVoluntario === true
+documentoConsignacao obrigatório quando consignacao === true
+Retorna HTTP 400 com mensagem clara quando faltar.
+TODO.md
+Marquei como concluído o item do Passo 1 (checar presença no register).
+Próximo (a continuar agora):
+
+Completar Passo 2 (2.4): criar rotas request/verify, gerar token/código 10 min e uso único, e proteger PUT /api/cruzados/atualizar/:id com JWT temporário.
+Depois: Passo 4 (8000 + e-mails 3.1/3.2 e deleção imediata do temp em rejeição).
+Nota: você ainda não pediu para eu rodar testes/servidor, então não foi executado nada no terminal.
+
+
+esta tudo certo pode continuar eu ja testei oq vc fez agora e esta funcionando pode continuar
+
+
+
+
+
+
+Executed
+cd c:/Users/tiago/OneDrive/Documentos/projeto_cruzada && node -c server.js
+
+Command Output
+
+Executed
+node -c server.js
+
+Command Output
+
+
+
+
+
+
+
+
+Task Completed
+Feito: 2.2 (documentos obrigatórios antes de enviar) e começou 2.4 (criou o model EmailVerificationToken, adicionou rotas routes/emailVerification.js e ligou em server.js na prefixo /api/auth/email-verification).
+
+Também marquei no TODO os itens já concluídos.
+
+Observação importante do progresso: no routes/emailVerification.js eu já gerei código numérico e enviei e-mail. A etapa que ainda falta finalizar é:
+
+Proteger PUT /api/cruzados/atualizar/:id com JWT temporário (e ajustar a lógica/filtro por CPF/cadastro).
+Próximo passo: completar Passo 3 e então Passo 4 (numero 8000 + e-mails 3.1/3.2 + deletar temp na recusa) e por fim Passo 5 (ajustar frontend para solicitar/digitar o código).
+
+
+pode fazer os passos restantes
