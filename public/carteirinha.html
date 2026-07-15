@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carteirinha Cruzada</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #d8e7f7;
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .card {
+      width: min(1080px, 100%);
+      background: #d7e7f8;
+      border: 2px solid #aac6eb;
+      border-radius: 24px;
+      box-shadow: 0 28px 60px rgba(0,0,0,0.16);
+      overflow: hidden;
+    }
+
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background: #eaf4fd;
+      padding: 26px 32px;
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      border-radius: 12px;
+      overflow: hidden;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      background: transparent;
+    }
+
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .top-text {
+      flex: 1;
+      text-align: center;
+    }
+
+    .top-text h1 {
+      margin: 0;
+      font-size: clamp(2rem, 2.6vw, 3rem);
+      color: #122a52;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .top-text p {
+      margin: 10px 0 0;
+      color: #1f3d68;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1.05fr 1.85fr 1fr;
+      gap: 20px;
+      padding: 32px;
+    }
+
+    .photo-box,
+    .info-box,
+    .qr-box {
+      background: #f6faff;
+      border-radius: 24px;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6);
+    }
+
+    .photo-box {
+      display: grid;
+      place-items: center;
+      min-height: 320px;
+    }
+
+    .photo-box img {
+      width: 100%;
+      max-width: 270px;
+      aspect-ratio: 4 / 5;
+      object-fit: cover;
+      border-radius: 24px;
+      border: 4px solid #e5f1fb;
+      background: #edf4fb;
+    }
+
+    .info-line {
+      margin-bottom: 18px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .info-line strong {
+      font-size: 1.1rem;
+      color: #162848;
+      min-width: 140px;
+    }
+
+    .info-line span {
+      font-size: 1.05rem;
+      color: #222d49;
+      line-height: 1.4;
+    }
+
+    .info-line.large strong {
+      font-size: 1.35rem;
+    }
+
+    .info-line.large span {
+      font-size: 1.35rem;
+    }
+
+    .qr-box {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 320px;
+    }
+
+    .qr-box img {
+      width: 100%;
+      max-width: 240px;
+      border-radius: 20px;
+      border: 1px solid #c5d5ed;
+      background: white;
+    }
+
+    .note {
+      padding: 22px 32px 28px;
+      background: rgba(255,255,255,0.9);
+      text-align: center;
+      color: #35416f;
+      font-size: 0.95rem;
+      border-top: 1px solid #d2e1f3;
+    }
+
+    .error {
+      color: #8b1f1f;
+      padding: 36px;
+      text-align: center;
+    }
+
+    @media (max-width: 960px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+
+      .top {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="top">
+      <div class="logo"><img id="logoImg" src="/logo_cruzada.jpeg" alt="Logo Cruzada"></div>
+      <div class="top-text">
+        <h1>CRUZADA DOS MILITARES ESPÍRITAS</h1>
+        <p id="topInfo">cme.org.br · e-mail: —</p>
+      </div>
+    </div>
+
+    <div class="main" id="content">
+      <div class="photo-box">
+        <img id="profilePhoto" src="" alt="Foto do Cruzado">
+      </div>
+
+      <div class="info-box">
+        <div class="info-line large"><strong>Cruzado Nr:</strong><span id="numeroCruzado">—</span></div>
+        <div class="info-line large"><strong>Nome:</strong><span id="nomeCruzado">—</span></div>
+        <div class="info-line large"><strong>Registro em</strong><span id="registroData">—</span></div>
+      </div>
+
+      <div class="qr-box">
+        <img id="qrCode" src="" alt="QR Code da carteirinha">
+      </div>
+    </div>
+
+    <div class="note">
+      “Este documento possui fins exclusivamente cadastrais e não é válido como identificação civil.”
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const numeroCruzado = params.get('numeroCruzado');
+    const profilePhoto = document.getElementById('profilePhoto');
+    const qrCode = document.getElementById('qrCode');
+    const nomeCruzado = document.getElementById('nomeCruzado');
+    const numeroCruzadoEl = document.getElementById('numeroCruzado');
+    const registroData = document.getElementById('registroData');
+    const card = document.querySelector('.card');
+
+    const formatDate = (dateString) => {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear()).slice(-2);
+      return `${day} / ${month} / ${year}`;
+    };
+
+    const renderError = (message) => {
+      card.innerHTML = `<div class="error">${message}</div>`;
+    };
+
+    if (!numeroCruzado) {
+      renderError('Número Cruzado não informado.');
+    } else {
+      fetch(`/api/cruzados/carteirinha/${encodeURIComponent(numeroCruzado)}`)
+        .then(async (response) => {
+          if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.message || 'Erro ao carregar carteirinha');
+          }
+          return response.json();
+        })
+        .then((data) => {
+          profilePhoto.src = data.fotoUrl || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22240%22 height=%22280%22 viewBox=%220 0 240 280%22%3E%3Crect width=%22240%22 height=%22280%22 fill=%22%23edf4fb%22/%3E%3Ctext x=%22120%22 y=%22150%22 font-size=%2222%22 font-family=%22Arial%22 fill=%22%23606f89%22 text-anchor=%22middle%22%3EFOTO%3C/text%3E%3C/svg%3E';
+          profilePhoto.alt = data.nome ? `Foto de ${data.nome}` : 'Foto do Cruzado';
+          qrCode.src = data.qrCodeDataUrl || '';
+          nomeCruzado.textContent = data.nome || '-';
+          numeroCruzadoEl.textContent = data.numeroCruzado || '-';
+          registroData.textContent = formatDate(data.dataNascimento);
+          // Atualizar top info para mostrar email do titular (sem https)
+          const topInfo = document.getElementById('topInfo');
+          if (topInfo) topInfo.textContent = `cme.org.br · e-mail: ${data.email || '-'}`;
+        })
+        .catch((err) => renderError(err.message));
+    }
+  </script>
+</body>
+</html>

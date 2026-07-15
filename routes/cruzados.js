@@ -4,6 +4,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const XLSX = require('xlsx');
 const nodemailer = require('nodemailer');
+const QRCode = require('qrcode');
 const Cruzado = require('../models/Cruzado');
 const CruzadoTemp = require('../models/CruzadoTemp');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -363,13 +364,15 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
         if (transporter) {
           const assuntoCandidato = 'Cadastro aprovado - Cruzada';
           const textoCandidato = `Olá, ${tempCruzado.nome}!\n\nSeu cadastro foi APROVADO.\n\nNúmero Cruzado: ${numeroCruzado}\n\nCarteirinha digital: (placeholder)\n\nObrigado!`;
-          const htmlCandidato = `
+          const baseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const carteirinhaUrl = `${baseUrl}/carteirinha.html?numeroCruzado=${numeroCruzado}`;
+      const htmlCandidato = `
             <div style="font-family: Arial, sans-serif;">
               <h3>Cadastro aprovado</h3>
               <p>Olá, <strong>${tempCruzado.nome}</strong>!</p>
               <p>Seu cadastro foi <strong>APROVADO</strong>.</p>
               <p><strong>Número Cruzado:</strong> ${numeroCruzado}</p>
-              <p>Carteirinha digital: (placeholder)</p>
+              <p>Sua carteirinha digital está disponível em: <a href="${carteirinhaUrl}">${carteirinhaUrl}</a></p>
               <p>Obrigado!</p>
             </div>
           `;
@@ -378,7 +381,7 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
             from: process.env.SMTP_FROM || process.env.SMTP_USER,
             to: tempCruzado.email,
             subject: assuntoCandidato,
-            text: textoCandidato,
+            text: textoCandidato + '\n\nAcesse: ' + carteirinhaUrl,
             html: htmlCandidato
           });
         }
@@ -488,6 +491,42 @@ router.get('/image/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao servir arquivo:', err);
     res.status(500).json({ message: 'Erro ao recuperar arquivo. Tente novamente.' });
+  }
+});
+
+// Obter dados da carteirinha digital de um Cruzado aprovado
+router.get('/carteirinha/:numeroCruzado', async (req, res) => {
+  try {
+    const { numeroCruzado } = req.params;
+    if (!numeroCruzado) {
+      return res.status(400).json({ message: 'Número do Cruzado é obrigatório.' });
+    }
+
+    const cruzado = await Cruzado.findOne({ numeroCruzado, status: 'aprovado' });
+    if (!cruzado) {
+      return res.status(404).json({ message: 'Carteirinha não encontrada para este número.' });
+    }
+
+    const baseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const validationUrl = `${baseUrl}/validar.html?numeroCruzado=${encodeURIComponent(cruzado.numeroCruzado)}`;
+    const qrCodeDataUrl = await QRCode.toDataURL(validationUrl, { width: 260 });
+    const fotoUrl = cruzado.foto ? `/api/cruzados/image/${cruzado.foto}` : null;
+
+    res.json({
+      nome: cruzado.nome,
+      numeroCruzado: cruzado.numeroCruzado,
+      cpf: cruzado.cpf,
+      vinculoProfissional: cruzado.vinculoProfissional,
+      nucleoOuGede: cruzado.nucleoOuGede,
+      dataNascimento: cruzado.dataNascimento,
+      email: cruzado.email,
+      status: cruzado.status,
+      qrCodeDataUrl,
+      fotoUrl
+    });
+  } catch (err) {
+    console.error('Erro ao gerar carteirinha:', err);
+    res.status(500).json({ message: 'Erro ao recuperar carteirinha. Tente novamente.' });
   }
 });
 

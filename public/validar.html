@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validação de Carteirinha</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; justify-content: center; align-items: center; background: #e8eff7; font-family: Arial, sans-serif; }
+    .wrapper { width: min(780px, 100%); background: white; border-radius: 24px; box-shadow: 0 24px 60px rgba(0,0,0,0.12); overflow: hidden; }
+    .header { background: #122f62; color: white; padding: 26px 28px; }
+    .header h1 { margin: 0; font-size: 1.9rem; }
+    .header p { margin: 10px 0 0; color: #d0dbf1; font-size: 0.95rem; }
+    .body { padding: 28px 32px; }
+    .status { font-size: 1.2rem; font-weight: 700; margin-bottom: 18px; }
+    .status.valid { color: #1f6f3e; }
+    .status.invalid { color: #a81f1f; }
+    .field { margin-bottom: 18px; }
+    .field strong { display: block; color: #122f62; margin-bottom: 6px; }
+    .field span { display: block; color: #33456f; }
+    .action { margin-top: 22px; }
+    .btn { display: inline-block; background: #122f62; color: white; padding: 14px 22px; border-radius: 10px; text-decoration: none; }
+    .error { color: #a81f1f; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>Validação de Carteirinha</h1>
+      <p>Verifique se o cadastro ainda está ativo no sistema.</p>
+    </div>
+    <div class="body" id="body">
+      <p>Carregando validação...</p>
+    </div>
+  </div>
+  <script>
+    const body = document.getElementById('body');
+    const params = new URLSearchParams(window.location.search);
+    const numeroCruzado = params.get('numeroCruzado');
+
+    const render = (html) => { body.innerHTML = html; };
+    const escapeHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    if (!numeroCruzado) {
+      render('<p class="error">Número Cruzado não informado.</p>');
+    } else {
+      fetch(`/api/validacao/${encodeURIComponent(numeroCruzado)}`)
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Erro ao validar.');
+          if (data.valid) {
+            render(`
+              <div class="status valid">Cadastro válido</div>
+              <div class="field"><strong>Nome</strong><span>${escapeHtml(data.nome)}</span></div>
+              <div class="field"><strong>Número Cruzado</strong><span>${escapeHtml(data.numeroCruzado)}</span></div>
+              <div class="field"><strong>CPF</strong><span>${escapeHtml(data.cpf)}</span></div>
+              <div class="field"><strong>Núcleo / GEDE</strong><span>${escapeHtml(data.nucleoOuGede)}</span></div>
+              <div class="field"><strong>Inscrição</strong><span>${escapeHtml(data.status)}</span></div>
+              <div class="action"><a class="btn" href="/">Voltar ao início</a></div>
+            `);
+          } else {
+            render(`
+              <div class="status invalid">Cadastro inválido</div>
+              <div class="field"><strong>Mensagem</strong><span>${escapeHtml(data.message)}</span></div>
+              <div class="action"><a class="btn" href="/">Voltar ao início</a></div>
+            `);
+          }
+        })
+        .catch((err) => {
+          render(`<p class="error">${escapeHtml(err.message)}</p>`);
+        });
+    }
+  </script>
+</body>
+</html>

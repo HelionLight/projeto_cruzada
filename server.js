@@ -23,8 +23,14 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/cruzados', require('./routes/cruzados'));
 app.use('/api/auth/email-verification', require('./routes/emailVerification'));
+app.use('/api/validacao', require('./routes/validacao'));
 
 // Servir frontend estático (se houver)
+// Servir logo na raiz (arquivo em project root)
+app.get('/logo_cruzada.jpeg', (req, res) => {
+  res.sendFile(path.join(__dirname, 'logo_cruzada.jpeg'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Rota padrão
