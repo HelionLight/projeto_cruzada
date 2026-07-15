@@ -625,11 +625,9 @@ router.get('/buscar', async (req, res) => {
       if (cruzado) return res.json(cruzado);
     }
 
-    // 3) Fallback mais robusto: comparar removendo non-digits do campo no DB (se disponível)
+    // 3) Fallback mais robusto: comparar CPF usando regex compatível
     try {
-      cruzado = await Cruzado.findOne({
-        $expr: { $eq: [ { $regexReplace: { input: '$cpf', regex: '\\D', replacement: '' } }, cpfLimpo ] }
-      });
+      cruzado = await Cruzado.findOne({ cpf: new RegExp('^' + cpfLimpo.split('').map(d => `${d}\\D*`).join('') + '$') });
       if (cruzado) return res.json(cruzado);
     } catch (e) {
       // Ignorar; já tentamos os casos exatos e sem formatação
@@ -692,9 +690,7 @@ router.put('/atualizar/:id', upload, verifyEditToken, async (req, res) => {
     const cpfNovoLimpo = req.body.cpf ? req.body.cpf.replace(/\D/g, '') : '';
     const cpfExistenteLimpo = cruzadoExistente.cpf ? cruzadoExistente.cpf.replace(/\D/g, '') : '';
     if (cpfNovoLimpo !== cpfExistenteLimpo) {
-      const cpfJaExiste = await Cruzado.findOne({ 
-        $expr: { $eq: [ { $regexReplace: { input: '$cpf', regex: '\\D', replacement: '' } }, cpfNovoLimpo ] } 
-      });
+      const cpfJaExiste = await Cruzado.findOne({ cpf: new RegExp('^' + cpfNovoLimpo.split('').map(d => `${d}\\D*`).join('') + '$') });
       if (cpfJaExiste) {
         return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
       }

@@ -30,6 +30,12 @@ const getEmailTransporter = () => {
 
 const normalizeCpf = (cpf) => String(cpf || '').replace(/\D/g, '');
 
+const buildCpfRegex = (cpfDigits) => {
+  const digits = String(cpfDigits || '').replace(/\D/g, '');
+  const pattern = '^' + digits.split('').map((digit) => `${digit}\\D*`).join('') + '$';
+  return new RegExp(pattern);
+};
+
 const formatarCodeLikeDigits = (s) => {
   // Garantir que o code não inclua caracteres estranhos (mantém simples)
   // Observação: aqui usamos um número aleatório como código.
@@ -71,9 +77,7 @@ router.post('/request', async (req, res) => {
       cruzado = await Cruzado.findOne({ cpf: cpfNormalizado });
     }
     if (!cruzado) {
-      cruzado = await Cruzado.findOne({
-        $expr: { $eq: [ { $regexReplace: { input: '$cpf', regex: '\\D', replacement: '' } }, cpfNormalizado ] }
-      });
+      cruzado = await Cruzado.findOne({ cpf: buildCpfRegex(cpfNormalizado) });
     }
 
     if (!cruzado) return res.status(404).json({ message: 'Cadastro não encontrado!' });

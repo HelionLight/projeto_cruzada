@@ -28,6 +28,15 @@ let cruzadoId = null;
 let cruzadoOriginal = null;
 let editToken = null;
 
+function mostrarEtapaCodigo() {
+  const codigoFormEl = document.getElementById('codigoForm');
+  const edicaoFormEl = document.getElementById('edicaoForm');
+  const buscaFormEl = document.getElementById('buscaForm');
+  if (codigoFormEl) codigoFormEl.style.display = 'block';
+  if (edicaoFormEl) edicaoFormEl.style.display = 'none';
+  if (buscaFormEl) buscaFormEl.style.display = 'block';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const buscarBtn = document.getElementById('buscarBtn');
   const cancelarBtn = document.getElementById('cancelarBtn');
@@ -274,17 +283,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function buscarCadastro() {
   const cpfRaw = document.getElementById('cpfBusca').value;
-  const dataNascimento = document.getElementById('dataNascimentoBusca').value;
 
   // Validar presença de 11 dígitos, mas enviar o CPF exatamente como o usuário digitou
   const cpf = cpfRaw.replace(/\D/g, '');
   if (!cpf || cpf.length !== 11) {
     alert('❌ CPF inválido: insira um CPF com 11 dígitos.');
-    return;
-  }
-
-  if (!dataNascimento) {
-    alert('❌ Data de Nascimento obrigatória para verificação.');
     return;
   }
 
@@ -298,13 +301,6 @@ async function buscarCadastro() {
 
     const cruzado = await response.json();
 
-    // Verificar data de nascimento
-    const dataNascimentoBD = new Date(cruzado.dataNascimento).toISOString().split('T')[0];
-    if (dataNascimentoBD !== dataNascimento) {
-      alert('❌ Data de Nascimento não corresponde. Verifique os dados.');
-      return;
-    }
-
     // Armazenar dados originais
     cruzadoId = cruzado._id;
     cruzadoOriginal = JSON.parse(JSON.stringify(cruzado));
@@ -314,8 +310,10 @@ async function buscarCadastro() {
 
     // Mostrar etapa de validação por e-mail antes de liberar a edição
     mostrarEtapaCodigo();
-    if (codigoInput) codigoInput.value = '';
-    if (statusCodigo) statusCodigo.textContent = '📩 Envie o código para liberar a edição.';
+    const codigoInputEl = document.getElementById('codigo');
+    if (codigoInputEl) codigoInputEl.value = '';
+    const statusCodigoEl = document.getElementById('statusCodigo');
+    if (statusCodigoEl) statusCodigoEl.textContent = '📩 Envie o código para liberar a edição.';
 
     alert('✅ Cadastro encontrado! Envie o código recebido por e-mail para liberar a edição.');
   } catch (error) {

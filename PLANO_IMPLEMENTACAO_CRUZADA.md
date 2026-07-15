@@ -63,6 +63,14 @@ O que pode ser feito:
 - no caso de aprovação, informar o número de cruzado atribuído e deixar preparado o espaço para a futura carteirinha digital;
 - no caso de recusa, informar claramente que o cadastro não foi aprovado e que nenhum número de cruzado foi atribuído.
 
+O que foi implementado:
+- alertas por e-mail para a secretaria após novo cadastro com contagem de registros pendentes;
+- fluxo de solicitação de código por e-mail para atualizar cadastro;
+- verificação do código e liberação de edição com token JWT temporário;
+- envio de e-mail para o candidato em casos de aprovação ou recusa;
+- atribuição automática de número de cruzado no momento da aprovação final;
+- placeholder preparado para a futura carteirinha digital.
+
 O que depende de você:
 - definir o texto final de cada e-mail;
 - confirmar quem deve receber os avisos da secretaria;
