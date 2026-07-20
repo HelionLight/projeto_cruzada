@@ -24,6 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (exportBtn) {
     exportBtn.addEventListener('click', exportarExcel);
   }
+
+  const importBtn = document.getElementById('importBtn');
+  if (importBtn) {
+    importBtn.addEventListener('click', importarPlanilhaExcel);
+  }
 });
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -165,6 +170,43 @@ async function exportarExcel() {
   } catch (error) {
     alert('❌ Erro ao exportar: ' + error.message);
   }
+}
+
+async function importarPlanilhaExcel() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+
+  input.onchange = async () => {
+    const arquivo = input.files && input.files[0];
+    if (!arquivo) return;
+
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
+    formData.append('target', 'permanent');
+
+    try {
+      const response = await fetch('/api/cruzados/import/excel', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        alert('❌ Erro ao importar: ' + (result.message || 'Tente novamente.'));
+        return;
+      }
+
+      const summary = result.summary || {};
+      alert(`✅ ${result.message}\nImportadas: ${summary.imported || 0}\nVálidas: ${summary.valid || 0}\nIgnoradas: ${summary.skipped || 0}\nErros: ${summary.errors || 0}`);
+      refreshPendingLists();
+    } catch (error) {
+      alert('❌ Erro de conexão: ' + error.message);
+    }
+  };
+
+  input.click();
 }
 
 // Carregar voluntários pendentes

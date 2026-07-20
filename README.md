@@ -1,3 +1,25 @@
+# Importação da base antiga
+
+Se você precisar trazer registros de uma planilha antiga para o sistema, use o importador incluso no projeto.
+
+## Comando
+
+```bash
+npm run import:legacy -- --file="C:\\caminho\\para\\base.xlsx"
+```
+
+## Opções
+
+- `--sheet=NomeDaPlanilha` para escolher outra aba do Excel.
+- `--target=temp` para importar como pendente na coleção temporária.
+- `--target=permanent` para importar direto como cadastro aprovado.
+- `--dry-run` para validar a planilha sem gravar no banco.
+
+## Observações
+
+- O importador tenta reconhecer nomes de colunas comuns automaticamente.
+- Se a planilha antiga usar nomes diferentes, posso ajustar o mapeamento depois.
+- Registros com campos obrigatórios faltando são ignorados e listados no resumo final.
 # Página de Registro - Cruzada (Opção 2: Node.js/Express/MongoDB)
 
 Esta é uma aplicação web para registro de "Cruzados" baseada nos parâmetros do documento Word e no fluxo do PDF. Usa Node.js, Express, MongoDB para backend, e HTML/CSS/JS para frontend.

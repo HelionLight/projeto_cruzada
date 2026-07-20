@@ -11,6 +11,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const verifyEditToken = require('../middleware/verifyEditToken');
 const Joi = require('joi');
 const CruzadoCounter = require('../models/CruzadoCounter');
+const { importFromBuffer } = require('../utils/legacyImport');
 
 const router = express.Router();
 
@@ -43,6 +44,11 @@ const upload = multer({
   { name: 'documentoVoluntario', maxCount: 1 },
   { name: 'documentoConsignacao', maxCount: 1 }
 ]);
+
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }
+}).single('arquivo');
 
 // Configuração do envio de e-mail para o secretário
 const getEmailTransporter = () => {
@@ -642,6 +648,36 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
     console.error('Erro ao exportar para Excel:', err);
     res.status(500).json({ message: 'Erro ao gerar arquivo Excel. Tente novamente.' });
   }
+});
+
+// Importar base antiga a partir de uma planilha Excel
+router.post('/import/excel', authenticate, authorize('admin', 'secretario'), (req, res) => {
+  uploadExcel(req, res, async (uploadError) => {
+    if (uploadError) {
+      return res.status(400).json({ message: uploadError.message || 'Erro ao enviar o arquivo Excel.' });
+    }
+
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ message: 'Envie um arquivo Excel válido.' });
+      }
+
+      const target = req.body.target === 'temp' ? 'temp' : 'permanent';
+      const sheetName = req.body.sheet || undefined;
+      const dryRun = String(req.body.dryRun || '').toLowerCase() === 'true';
+
+      const summary = await importFromBuffer(req.file.buffer, { sheetName, target, dryRun });
+
+      return res.json({
+        message: dryRun ? 'Validação da planilha concluída.' : 'Importação concluída com sucesso.',
+        summary,
+        dryRun
+      });
+    } catch (err) {
+      console.error('Erro ao importar base antiga:', err);
+      return res.status(500).json({ message: err.message || 'Erro ao importar base antiga.' });
+    }
+  });
 });
 
 // Buscar Cruzado por CPF (para edição)

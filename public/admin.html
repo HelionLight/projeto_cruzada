@@ -17,7 +17,10 @@
     </div>
     <div id="adminPanel" style="display: none;">
       <h2>Registros Pendentes - Cruzados</h2>
-      <button id="exportBtn" class="btnExport">📥 Exportar para Excel</button>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;">
+        <button id="exportBtn" class="btnExport">📥 Exportar para Excel</button>
+        <button id="importBtn" class="btnExport">📤 Importar planilha Excel</button>
+      </div>
       <div id="pendingList">
         <table class="pendingTable">
           <thead>
