@@ -199,7 +199,7 @@ async function importarPlanilhaExcel() {
       }
 
       const summary = result.summary || {};
-      alert(`✅ ${result.message}\nImportadas: ${summary.imported || 0}\nVálidas: ${summary.valid || 0}\nIgnoradas: ${summary.skipped || 0}\nErros: ${summary.errors || 0}`);
+      alert(`✅ ${result.message}\nImportadas: ${summary.imported || 0}\nAtualizadas: ${summary.updated || 0}\nVálidas: ${summary.valid || 0}\nIgnoradas: ${summary.skipped || 0}\nErros: ${summary.errors || 0}`);
       refreshPendingLists();
     } catch (error) {
       alert('❌ Erro de conexão: ' + error.message);

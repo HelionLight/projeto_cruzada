@@ -173,12 +173,17 @@ const createSummary = () => ({
   read: 0,
   valid: 0,
   imported: 0,
+  updated: 0,
   errors: 0,
   skipped: 0,
   invalidRows: []
 });
 
 const resolveModel = (target) => (target === 'permanent' ? Cruzado : CruzadoTemp);
+
+const stripUndefined = (value) => Object.fromEntries(
+  Object.entries(value).filter(([, entry]) => entry !== undefined)
+);
 
 const importRows = async (rows, options = {}) => {
   const { target = 'temp', dryRun = false } = options;
@@ -206,8 +211,20 @@ const importRows = async (rows, options = {}) => {
     try {
       const cpfExists = await Model.findOne({ cpf: document.cpf });
       if (cpfExists) {
-        summary.skipped += 1;
-        summary.invalidRows.push({ row: document.rowNumber, reason: `CPF já existente: ${document.cpf}` });
+        const updatePayload = stripUndefined({
+          ...document,
+          updatedAt: new Date(),
+          status: target === 'permanent' ? 'aprovado' : 'pendente',
+          createdAt: cpfExists.createdAt || document.createdAt
+        });
+
+        await Model.findOneAndUpdate(
+          { cpf: document.cpf },
+          { $set: updatePayload },
+          { new: true }
+        );
+
+        summary.updated += 1;
         continue;
       }
 
@@ -255,6 +272,7 @@ const printSummary = (summary) => {
   console.log(`Linhas lidas: ${summary.read}`);
   console.log(`Válidas: ${summary.valid}`);
   console.log(`Importadas: ${summary.imported}`);
+  console.log(`Atualizadas: ${summary.updated}`);
   console.log(`Com erro: ${summary.errors}`);
   console.log(`Ignoradas: ${summary.skipped}`);
 
