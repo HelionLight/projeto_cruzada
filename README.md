@@ -1,86 +1,158 @@
-# Importação da base antiga
+# Projeto Cruzada
 
-Se você precisar trazer registros de uma planilha antiga para o sistema, use o importador incluso no projeto.
+Sistema web de cadastro, aprovação e validação de Cruzados, desenvolvido com Node.js, Express e MongoDB.
 
-## Comando
+## Visão geral
+
+A aplicação atualmente inclui:
+
+- cadastro público de novos Cruzados;
+- upload de foto e documentos em PDF;
+- fluxo de aprovação e rejeição no painel administrativo;
+- revisão de documentos de voluntariado e consignação;
+- atualização de cadastro com verificação por código enviado por e-mail;
+- carteirinha digital com QR Code e página de validação online;
+- importação de base antiga via planilha Excel;
+- exportação de cadastros aprovados para Excel;
+- autenticação de administrador por JWT.
+
+## Funcionalidades principais
+
+### Cadastro
+- Formulário público em `public/index.html`.
+- Upload de foto, certificado de indicação, termo de voluntariado e termo de consignação.
+- Validações no backend e no frontend.
+
+### Painel administrativo
+- Painel em `public/admin.html`.
+- Listagem de pendentes.
+- Aprovação/rejeição de cadastros.
+- Visualização de fotos e documentos.
+- Exportação para Excel.
+- Importação de planilha Excel para o banco.
+
+### Atualização de cadastro
+- Fluxo protegido por e-mail e código temporário.
+- O usuário informa CPF, recebe um código e libera a edição por tempo limitado.
+
+### Carteirinha digital
+- Página em `public/carteirinha.html`.
+- QR Code aponta para a página de validação.
+- Página de validação em `public/validar.html`.
+- A validação consulta o banco para verificar se o cadastro ainda está ativo/aprovado.
+
+### Importação da base antiga
+- Script em `scripts/import-base-antiga.js`.
+- Utilitário compartilhado em `utils/legacyImport.js`.
+- Também disponível no admin por botão de upload.
+- Se o CPF já existir, o cadastro é atualizado.
+
+## Requisitos
+
+- Node.js 18+.
+- MongoDB local ou MongoDB Atlas.
+- Conta SMTP para envio de e-mails.
+
+## Instalação
 
 ```bash
-npm run import:legacy -- --file="C:\\caminho\\para\\base.xlsx"
+npm install
 ```
 
-## Opções
+## Configuração do `.env`
 
-- `--sheet=NomeDaPlanilha` para escolher outra aba do Excel.
-- `--target=temp` para importar como pendente na coleção temporária.
-- `--target=permanent` para importar direto como cadastro aprovado.
-- `--dry-run` para validar a planilha sem gravar no banco.
+Exemplo de variáveis usadas pelo projeto:
+
+```env
+MONGO_URI=mongodb://localhost:27017/cruzada
+JWT_SECRET=uma_chave_forte_aqui
+SMTP_HOST=smtp.exemplo.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=seu_email@exemplo.com
+SMTP_PASS=sua_senha
+SMTP_FROM=seu_email@exemplo.com
+SECRETARIO_EMAIL=secretaria@exemplo.com
+APP_BASE_URL=https://seu-dominio-publico.com
+```
+
+## Execução
+
+```bash
+npm start
+```
+
+Ou em modo desenvolvimento:
+
+```bash
+npm run dev
+```
+
+A aplicação fica disponível em:
+
+- `http://localhost:3000`
+- painel admin: `http://localhost:3000/admin`
+- carteirinha: `http://localhost:3000/carteirinha.html?numeroCruzado=8001`
+- validação: `http://localhost:3000/validar.html?numeroCruzado=8001`
+
+## Scripts úteis
+
+### Importar base antiga
+
+```bash
+npm run import:legacy -- --file="C:\caminho\para\base.xlsx"
+```
+
+Opções:
+
+- `--sheet=NomeDaPlanilha`
+- `--target=temp` ou `--target=permanent`
+- `--dry-run`
+
+### Observação sobre importação
+
+- Por padrão, a importação grava em `permanent`.
+- Se o CPF já existir, o registro é atualizado com os dados da planilha.
+- Campos não enviados pela planilha são preservados no banco.
+
+## Rotas principais da API
+
+### Auth
+- `POST /api/auth/login`
+- `POST /api/auth/email-verification/request`
+- `POST /api/auth/email-verification/verify`
+
+### Cruzados
+- `POST /api/cruzados/register`
+- `GET /api/cruzados/pending`
+- `GET /api/cruzados/pending/voluntarios`
+- `GET /api/cruzados/consignacao`
+- `GET /api/cruzados/export/excel`
+- `POST /api/cruzados/import/excel`
+- `GET /api/cruzados/image/:id`
+- `GET /api/cruzados/carteirinha/:numeroCruzado`
+- `GET /api/cruzados/buscar?cpf=...`
+- `PUT /api/cruzados/:id/status`
+- `PUT /api/cruzados/atualizar/:id`
+- `PUT /api/cruzados/:numeroCruzado`
+- `DELETE /api/cruzados/:numeroCruzado`
+
+### Validação
+- `GET /api/validacao/:numeroCruzado`
+
+## Estrutura do projeto
+
+- `server.js` - servidor principal.
+- `models/` - schemas do MongoDB.
+- `routes/` - rotas da API.
+- `middleware/` - autenticação e autorização.
+- `public/` - páginas HTML/CSS/JS.
+- `scripts/` - utilitários de manutenção/importação.
+- `utils/` - lógica compartilhada.
 
 ## Observações
 
-- O importador tenta reconhecer nomes de colunas comuns automaticamente.
-- Se a planilha antiga usar nomes diferentes, posso ajustar o mapeamento depois.
-- Registros com campos obrigatórios faltando são ignorados e listados no resumo final.
-# Página de Registro - Cruzada (Opção 2: Node.js/Express/MongoDB)
-
-Esta é uma aplicação web para registro de "Cruzados" baseada nos parâmetros do documento Word e no fluxo do PDF. Usa Node.js, Express, MongoDB para backend, e HTML/CSS/JS para frontend.
-
-## Funcionalidades
-- Formulário de registro com todos os campos obrigatórios.
-- Upload de foto (armazenada no MongoDB via GridFS).
-- Validação de dados.
-- Workflow de aprovações (pendente/aprovado/rejeitado).
-- Painel admin para gerenciar registros.
-- Autenticação JWT para admins.
-
-## Pré-requisitos
-- Node.js instalado.
-- MongoDB instalado e rodando (local ou Atlas).
-- Conta no MongoDB Atlas (opcional para produção).
-
-## Instalação
-1. Clone ou baixe os arquivos na pasta `opção 2`.
-2. Instale dependências: `npm install`.
-3. Configure `.env`:
-   - `MONGO_URI`: URL do MongoDB (ex.: mongodb://localhost:27017/cruzada).
-   - `JWT_SECRET`: Chave secreta para JWT.
-5. Instale MongoDB se necessário (para Windows, use MongoDB Community Server).
-
-## Execução
-1. Inicie MongoDB.
-2. Rode o servidor: `npm start` ou `npm run dev` (com nodemon).
-3. Acesse http://localhost:3000.
-
-## Uso
-- Página principal: Formulário de registro.
-- Para aprovações: Use Postman ou crie um painel admin (não incluído, mas APIs prontas em `/api/cruzados`).
-
-## APIs
-- POST /api/cruzados/register: Enviar formulário.
-- GET /api/cruzados/pending: Listar pendentes (autenticado).
-- PUT /api/cruzados/:id/status: Aprovar/rejeitar.
-- PUT /api/cruzados/:numeroCruzado: Atualizar.
-- DELETE /api/cruzados/:numeroCruzado: Excluir.
-- GET /api/cruzados/image/:id: Servir imagem do GridFS.
-
-## Melhorias Implementadas
-- Segurança: Removido endpoint inseguro, tratamento de erros robusto.
-- Robustez: Try-catch em todas as rotas, middleware de erro global.
-- Consistência: Sub-schema para padrinhos, validações consistentes.
-- UX: Validações básicas no frontend, painel admin funcional.
-- Performance: Índices MongoDB para queries frequentes.
-- Configuração: Arquivo .env.example para facilitar setup.
-
-## Próximos Passos (Você Faz)
-- Hospedar: Use Vercel/Netlify para frontend, Heroku/Render para backend, MongoDB Atlas.
-- Melhorar frontend: Responsividade, validações avançadas (CPF real).
-- Segurança: HTTPS, rate limiting, validação de uploads.
-- Testes: Adicionar testes unitários e de integração.
-- Link no WordPress: Adicione um link no WP para http://seudominio.com.
-
-## Estrutura de Arquivos
-- `server.js`: Servidor principal.
-- `models/`: Schemas MongoDB.
-- `routes/`: APIs.
-- `middleware/`: Autenticação.
-- `public/`: Frontend.
-- `.env`: Configurações.
+- O projeto usa GridFS para armazenar arquivos enviados.
+- A carteirinha digital depende de `APP_BASE_URL` para gerar o link público correto.
+- O fluxo de validação foi desenhado para uso online, não apenas local.
+- Para produção, é recomendável revisar custo de banco/arquivos conforme a quantidade de cadastros e anexos.
