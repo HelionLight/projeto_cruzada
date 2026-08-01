@@ -356,6 +356,7 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
         ...tempCruzado.toObject(),
         numeroCruzado,
         status: 'aprovado',
+        dataAprovacao: new Date(),
         updatedAt: Date.now()
       });
 
@@ -525,6 +526,7 @@ router.get('/carteirinha/:numeroCruzado', async (req, res) => {
       vinculoProfissional: cruzado.vinculoProfissional,
       nucleoOuGede: cruzado.nucleoOuGede,
       dataNascimento: cruzado.dataNascimento,
+      dataAprovacao: cruzado.dataAprovacao || cruzado.updatedAt || cruzado.createdAt,
       email: cruzado.email,
       status: cruzado.status,
       qrCodeDataUrl,

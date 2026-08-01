@@ -245,7 +245,7 @@
           qrCode.src = data.qrCodeDataUrl || '';
           nomeCruzado.textContent = data.nome || '-';
           numeroCruzadoEl.textContent = data.numeroCruzado || '-';
-          registroData.textContent = formatDate(data.dataNascimento);
+          registroData.textContent = formatDate(data.dataAprovacao);
           // Atualizar top info para mostrar email do titular (sem https)
           const topInfo = document.getElementById('topInfo');
           if (topInfo) topInfo.textContent = `cme.org.br · e-mail: ${data.email || '-'}`;
