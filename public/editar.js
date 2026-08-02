@@ -27,6 +27,27 @@ function formatarCelular(celular) {
 let cruzadoId = null;
 let cruzadoOriginal = null;
 let editToken = null;
+let numeroCruzadoBusca = '';
+
+// Normaliza nome para comparação (ignora acentos/caixa/duplos espaços)
+function normalizarNome(nome) {
+  return String(nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function mostrarSemEmailForm(show) {
+  const semEmailForm = document.getElementById('semEmailForm');
+  if (semEmailForm) semEmailForm.style.display = show ? 'block' : 'none';
+}
+
+function mostrarCodigoForm(show) {
+  const codigoFormEl = document.getElementById('codigoForm');
+  if (codigoFormEl) codigoFormEl.style.display = show ? 'block' : 'none';
+}
 
 function mostrarEtapaCodigo() {
   const codigoFormEl = document.getElementById('codigoForm');
@@ -94,8 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const cpfRaw = document.getElementById('cpfBusca')?.value;
       const cpfNormalizado = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
-      if (!cpfNormalizado || cpfNormalizado.length !== 11) {
-        alert('❌ CPF inválido para solicitar código.');
+      const payload = {};
+      if (cpfNormalizado && cpfNormalizado.length === 11) {
+        payload.cpf = cpfNormalizado;
+      } else if (numeroCruzadoBusca) {
+        payload.numeroCruzado = numeroCruzadoBusca;
+      }
+      if (!payload.cpf && !payload.numeroCruzado) {
+        alert('❌ Informe um CPF válido (11 dígitos) ou busque pelo Número Cruzado.');
         return;
       }
 
@@ -105,11 +132,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const resp = await fetch('/api/auth/email-verification/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cpf: cpfNormalizado })
+        body: JSON.stringify(payload)
       });
 
       const data = await resp.json();
       if (!resp.ok) {
+        // Se o cadastro não tem e-mail, oferecer o fluxo alternativo (nome + número)
+        if (data && data.code === 'NO_EMAIL') {
+          mostrarSemEmailForm(true);
+          mostrarCodigoForm(false);
+          const numeroSemEmail = document.getElementById('numeroSemEmail');
+          if (numeroSemEmail) numeroSemEmail.value = cruzadoOriginal?.numeroCruzado || numeroCruzadoBusca || '';
+          const statusSemEmail = document.getElementById('statusSemEmail');
+          if (statusSemEmail) statusSemEmail.textContent = data.message || 'Este cadastro não possui e-mail. Valide por nome e número.';
+          return;
+        }
         throw new Error(data.message || 'Erro ao solicitar código.');
       }
 
@@ -131,12 +168,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const cpfRaw = document.getElementById('cpfBusca')?.value;
       const cpfNormalizado = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
       const code = (codigoInput?.value || '').replace(/\D/g, '');
-      if (!cpfNormalizado || cpfNormalizado.length !== 11) {
-        alert('❌ CPF inválido.');
-        return;
-      }
       if (!code) {
         alert('❌ Digite o código recebido.');
+        return;
+      }
+
+      const payload = {};
+      if (cpfNormalizado && cpfNormalizado.length === 11) {
+        payload.cpf = cpfNormalizado;
+      } else if (numeroCruzadoBusca) {
+        payload.numeroCruzado = numeroCruzadoBusca;
+      }
+      if (!payload.cpf && !payload.numeroCruzado) {
+        alert('❌ Informe um CPF válido (11 dígitos) ou busque pelo Número Cruzado.');
         return;
       }
 
@@ -145,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const resp = await fetch('/api/auth/email-verification/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cpf: cpfNormalizado, code })
+        body: JSON.stringify({ ...payload, code })
       });
 
       const data = await resp.json();
@@ -166,11 +210,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const validarSemEmail = async () => {
+    try {
+      if (!cruzadoId) {
+        alert('❌ Busque o cadastro antes de validar.');
+        return;
+      }
+
+      const nomeSemEmail = document.getElementById('nomeSemEmail')?.value || '';
+      const numeroSemEmailRaw = document.getElementById('numeroSemEmail')?.value || '';
+      const numeroSemEmail = numeroSemEmailRaw.replace(/\D/g, '');
+
+      if (!normalizarNome(nomeSemEmail)) {
+        alert('❌ Informe seu nome completo.');
+        return;
+      }
+      if (!numeroSemEmail) {
+        alert('❌ Informe o Número Cruzado.');
+        return;
+      }
+
+      const statusSemEmail = document.getElementById('statusSemEmail');
+      if (statusSemEmail) statusSemEmail.textContent = '🔎 Validando identidade...';
+
+      const resp = await fetch('/api/auth/email-verification/request-sem-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: nomeSemEmail, numeroCruzado: numeroSemEmail })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        if (statusSemEmail) statusSemEmail.textContent = '❌ ' + (data.message || 'Falha na validação.');
+        alert('❌ ' + (data.message || 'Falha na validação.'));
+        return;
+      }
+
+      editToken = data.token;
+      if (statusSemEmail) statusSemEmail.textContent = '✅ Identidade validada. Você já pode editar e salvar.';
+      habilitarEdicao(true);
+      const edicaoForm = document.getElementById('edicaoForm');
+      if (edicaoForm) edicaoForm.style.display = 'block';
+    } catch (e) {
+      const statusSemEmail = document.getElementById('statusSemEmail');
+      if (statusSemEmail) statusSemEmail.textContent = '❌ ' + e.message;
+      alert('❌ ' + e.message);
+    }
+  };
+
   // inicialmente, edição desabilitada até validar código
   habilitarEdicao(false);
 
   if (solicitarCodigoBtn) solicitarCodigoBtn.addEventListener('click', solicitarCodigo);
   if (verificarCodigoBtn) verificarCodigoBtn.addEventListener('click', verificarCodigo);
+
+  const validarSemEmailBtn = document.getElementById('validarSemEmailBtn');
+  if (validarSemEmailBtn) validarSemEmailBtn.addEventListener('click', validarSemEmail);
 
 
   // Formatação de CPF na busca
@@ -282,20 +377,40 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function buscarCadastro() {
-  const cpfRaw = document.getElementById('cpfBusca').value;
+  const valorBusca = document.getElementById('cpfBusca').value.trim();
+  const apenasDigitos = valorBusca.replace(/\D/g, '');
 
-  // Validar presença de 11 dígitos, mas enviar o CPF exatamente como o usuário digitou
-  const cpf = cpfRaw.replace(/\D/g, '');
-  if (!cpf || cpf.length !== 11) {
-    alert('❌ CPF inválido: insira um CPF com 11 dígitos.');
+  if (!valorBusca) {
+    alert('❌ Informe o CPF ou o Número Cruzado.');
     return;
   }
 
+  numeroCruzadoBusca = '';
+  mostrarSemEmailForm(false);
+  mostrarCodigoForm(false);
+
+  // Se parecer um número (sem letras) e não tiver 11 dígitos, tratar como numeroCruzado
+  const pareceNumero = /^[\d\s.\-]+$/.test(valorBusca);
+  const isCpf = apenasDigitos.length === 11;
+  const isNumeroCruzado = pareceNumero && !isCpf && apenasDigitos.length > 0;
+
   try {
-    const response = await fetch(`/api/cruzados/buscar?cpf=${encodeURIComponent(cpfRaw)}`);
+    let url;
+    if (isNumeroCruzado) {
+      url = `/api/cruzados/buscar?numeroCruzado=${encodeURIComponent(apenasDigitos)}`;
+      numeroCruzadoBusca = apenasDigitos;
+    } else {
+      if (!isCpf) {
+        alert('❌ CPF inválido: insira um CPF com 11 dígitos.');
+        return;
+      }
+      url = `/api/cruzados/buscar?cpf=${encodeURIComponent(valorBusca)}`;
+    }
+
+    const response = await fetch(url);
     
     if (!response.ok) {
-      alert('❌ Cadastro não encontrado. Verifique o CPF informado.');
+      alert('❌ Cadastro não encontrado. Verifique o CPF ou o Número Cruzado informado.');
       return;
     }
 
@@ -308,8 +423,19 @@ async function buscarCadastro() {
     // Preencher formulário
     preencherFormulario(cruzado);
 
-    // Mostrar etapa de validação por e-mail antes de liberar a edição
-    mostrarEtapaCodigo();
+    // Se não tiver e-mail, mostrar fluxo alternativo (nome + número)
+    if (!cruzado.email) {
+      mostrarSemEmailForm(true);
+      mostrarCodigoForm(false);
+      const numeroSemEmail = document.getElementById('numeroSemEmail');
+      if (numeroSemEmail) numeroSemEmail.value = cruzado.numeroCruzado || numeroCruzadoBusca || '';
+      const statusSemEmail = document.getElementById('statusSemEmail');
+      if (statusSemEmail) statusSemEmail.textContent = 'Cadastro localizado. Valide abaixo para liberar a edição.';
+      return;
+    }
+
+    // Com e-mail: mostrar etapa de validação por e-mail antes de liberar a edição
+    mostrarCodigoForm(true);
     const codigoInputEl = document.getElementById('codigo');
     if (codigoInputEl) codigoInputEl.value = '';
     const statusCodigoEl = document.getElementById('statusCodigo');
@@ -378,28 +504,32 @@ async function atualizarCadastro(e) {
 
   const formData = new FormData(e.target);
 
-  // Validar CPF (remover formatação, se houver, e contar dígitos)
+  // CPF: validar somente se o registro possui CPF (registros legados podem não ter)
   const cpfRaw = formData.get('cpf');
   const cpf = cpfRaw ? cpfRaw.replace(/\D/g, '') : '';
-  if (!cpf || cpf.length !== 11) {
+  const temCpfOriginal = Boolean(cruzadoOriginal?.cpf);
+  if (temCpfOriginal && (!cpf || cpf.length !== 11)) {
     alert('❌ CPF inválido: deve conter 11 dígitos.');
     return;
   }
+  if (cpf) {
+    formData.set('cpf', cpf);
+  }
 
-  // Validar Celular (remover formatação, se houver, e contar dígitos)
+  // Celular: validar somente se o registro possui celular
   const celularRaw = formData.get('celular');
   const celular = celularRaw ? celularRaw.replace(/\D/g, '') : '';
-  if (!celular || celular.length < 10) {
+  const temCelularOriginal = Boolean(cruzadoOriginal?.celular);
+  if (temCelularOriginal && (!celular || celular.length < 10)) {
     alert('❌ Celular inválido: deve ter pelo menos 10 dígitos.');
     return;
   }
-
-  // Remover formatação antes de enviar (enviar CPF e celular sem caracteres especiais)
-  formData.set('cpf', cpf);
-  formData.set('celular', celular);
+  if (celular) {
+    formData.set('celular', celular);
+  }
 
   if (!editToken) {
-    alert('❌ Você precisa validar o código por e-mail antes de salvar.');
+    alert('❌ Você precisa validar o código ou identidade antes de salvar.');
     return;
   }
 
@@ -440,11 +570,21 @@ function limparFormulario() {
   const ev = document.getElementById('especificarVinculoContainer'); if (ev) ev.style.display = 'none';
   const es = document.getElementById('especificarSituacaoContainer'); if (es) es.style.display = 'none';
   const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.display = 'none';
+  const cd = document.getElementById('consignacaoDocumentoContainer'); if (cd) cd.style.display = 'none';
   const codigoInput = document.getElementById('codigo');
   const statusCodigo = document.getElementById('statusCodigo');
   if (codigoInput) codigoInput.value = '';
   if (statusCodigo) statusCodigo.textContent = '';
+  // Resetar fluxo sem e-mail
+  mostrarSemEmailForm(false);
+  const nomeSemEmail = document.getElementById('nomeSemEmail');
+  const numeroSemEmail = document.getElementById('numeroSemEmail');
+  const statusSemEmail = document.getElementById('statusSemEmail');
+  if (nomeSemEmail) nomeSemEmail.value = '';
+  if (numeroSemEmail) numeroSemEmail.value = '';
+  if (statusSemEmail) statusSemEmail.textContent = '';
   editToken = null;
   cruzadoId = null;
   cruzadoOriginal = null;
+  numeroCruzadoBusca = '';
 }

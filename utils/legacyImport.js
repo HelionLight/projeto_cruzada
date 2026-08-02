@@ -63,7 +63,7 @@ const mapVinculo = (value) => {
   if (text.includes('polícia militar') || text.includes('policia militar')) return 'Polícia Militar';
   if (text.includes('corpo de bombeiros')) return 'Corpo de Bombeiros Militar';
   if (text.includes('civil')) return 'Civil';
-  return 'Outros';
+  return null;
 };
 
 const mapSituacao = (value) => {
@@ -73,7 +73,7 @@ const mapSituacao = (value) => {
   if (text.includes('reform')) return 'Reformado';
   if (text.includes('aposent')) return 'Aposentado';
   if (text.includes('pension')) return 'Pensionista';
-  return 'Outros';
+  return null;
 };
 
 const mapFormacao = (value) => {
@@ -83,7 +83,14 @@ const mapFormacao = (value) => {
   if (text.includes('super')) return 'superior';
   if (text.includes('mestre')) return 'mestre';
   if (text.includes('dout')) return 'doutor';
-  return 'medio';
+  return null;
+};
+
+// Converte string vazia/undefined para null (seguro para gravação no Mongo)
+const nullIfEmpty = (value) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  return value;
 };
 
 const buildDocument = (row, rowNumber, target) => {
@@ -96,7 +103,7 @@ const buildDocument = (row, rowNumber, target) => {
   const endereco = normalizeText(getHeaderValue(row, ['endereco', 'endereço', 'logradouro']));
   const cep = normalizeDigits(getHeaderValue(row, ['cep', 'codigo postal', 'código postal']));
   const sexoRaw = normalizeText(getHeaderValue(row, ['sexo', 'genero', 'gênero'])).toLowerCase();
-  const sexo = sexoRaw.startsWith('f') ? 'feminino' : 'masculino';
+  const sexo = sexoRaw.startsWith('f') ? 'feminino' : (sexoRaw ? 'masculino' : null);
   const dataNascimento = parseDate(getHeaderValue(row, ['data de nascimento', 'nascimento', 'dt nascimento', 'data_nascimento']));
   const vinculoSource = getHeaderValue(row, ['vinculo profissional', 'vínculo profissional', 'vinculo', 'vínculo']);
   const especificarVinculo = normalizeText(getHeaderValue(row, ['especificar vinculo', 'especificar vínculo', 'observacao vinculo', 'observação vínculo']));
@@ -106,65 +113,60 @@ const buildDocument = (row, rowNumber, target) => {
   const nucleoOuGede = normalizeText(getHeaderValue(row, ['nucleo ou gede', 'núcleo ou gede', 'nucleo/gede', 'núcleo/gede', 'nucleo', 'núcleo']));
   const nomeResponsavelIndicacao = normalizeText(getHeaderValue(row, ['nome responsavel indicacao', 'nome responsável indicação', 'indicador', 'responsavel indicacao']));
   const cpfResponsavelIndicacao = normalizeDigits(getHeaderValue(row, ['cpf responsavel indicacao', 'cpf responsável indicação', 'cpf indicador']));
-  const desejaContribuir = parseBoolean(getHeaderValue(row, ['deseja contribuir', 'contribui', 'contribuir']));
+  const desejaContribuir = parseBoolean(getHeaderValue(row, ['deseja contribuir', 'contribui', 'contribuir']), null);
   const valorContribuicaoRaw = getHeaderValue(row, ['valor contribuicao', 'valor contribuição', 'contribuicao', 'contribuição']);
   const valorContribuicao = valorContribuicaoRaw === undefined || valorContribuicaoRaw === null || valorContribuicaoRaw === ''
-    ? undefined
-    : Number(String(valorContribuicaoRaw).replace(',', '.'));
-  const consignacao = parseBoolean(getHeaderValue(row, ['consignacao', 'consignação']));
-  const encarnado = parseBoolean(getHeaderValue(row, ['encarnado']));
-  const trabalharVoluntario = parseBoolean(getHeaderValue(row, ['trabalhar voluntario', 'trabalhar voluntário', 'voluntario', 'voluntário']));
+    ? null
+    : Number(String(valorContribuicaoRaw).replace('.', '').replace(',', '.'));
+  const consignacao = parseBoolean(getHeaderValue(row, ['consignacao', 'consignação']), null);
+  const encarnado = parseBoolean(getHeaderValue(row, ['encarnado']), null);
+  const trabalharVoluntario = parseBoolean(getHeaderValue(row, ['trabalhar voluntario', 'trabalhar voluntário', 'voluntario', 'voluntário']), false);
   const numeroCruzadoRaw = normalizeText(getHeaderValue(row, ['numero cruzado', 'número cruzado', 'numero', 'número']));
-  const numeroCruzado = numeroCruzadoRaw || undefined;
+  const numeroCruzado = numeroCruzadoRaw || null;
+  const dataAprovacao = parseDate(getHeaderValue(row, ['data aprovacao', 'data aprovação', 'dataaprovacao', 'data de aprovacao']));
 
   return {
     rowNumber,
-    nome,
-    cpf,
-    celular,
-    email,
-    estado,
-    cidade,
-    endereco,
-    cep,
+    nome: nome || null,
+    cpf: cpf || null,
+    celular: celular || null,
+    email: email || null,
+    estado: estado || null,
+    cidade: cidade || null,
+    endereco: endereco || null,
+    cep: cep || null,
     sexo,
     dataNascimento,
     vinculoProfissional: mapVinculo(vinculoSource),
-    especificarVinculo: especificarVinculo || undefined,
+    especificarVinculo: especificarVinculo || null,
     situacaoProfissional: mapSituacao(situacaoSource),
-    especificarSituacao: especificarSituacao || undefined,
+    especificarSituacao: especificarSituacao || null,
     formacao,
-    nucleoOuGede,
-    nomeResponsavelIndicacao: nomeResponsavelIndicacao || undefined,
-    cpfResponsavelIndicacao: cpfResponsavelIndicacao || undefined,
+    nucleoOuGede: nucleoOuGede || null,
+    nomeResponsavelIndicacao: nomeResponsavelIndicacao || null,
+    cpfResponsavelIndicacao: cpfResponsavelIndicacao || null,
     desejaContribuir,
-    valorContribuicao: Number.isFinite(valorContribuicao) ? valorContribuicao : undefined,
+    valorContribuicao: Number.isFinite(valorContribuicao) ? valorContribuicao : null,
     consignacao,
     numeroCruzado,
     encarnado,
     trabalharVoluntario,
     status: target === 'permanent' ? 'aprovado' : 'pendente',
+    dataAprovacao: target === 'permanent' ? (dataAprovacao || new Date()) : null,
+    origem: 'legado',
     createdAt: new Date(),
     updatedAt: new Date()
   };
 };
 
-const validateDocument = (document) => {
+// Validação leniente para o fluxo legado: apenas nome e numeroCruzado são essenciais.
+// Campos ausentes são aceitos como null/vazio.
+const validateDocument = (document, options = {}) => {
+  const { target = 'permanent' } = options;
   const missing = [];
-  const requiredStringFields = ['nome', 'cpf', 'celular', 'email', 'estado', 'cidade', 'endereco', 'cep', 'nucleoOuGede'];
 
-  requiredStringFields.forEach((field) => {
-    if (!normalizeText(document[field])) missing.push(field);
-  });
-
-  if (!document.dataNascimento) missing.push('dataNascimento');
-  if (!document.vinculoProfissional) missing.push('vinculoProfissional');
-  if (!document.situacaoProfissional) missing.push('situacaoProfissional');
-  if (!document.formacao) missing.push('formacao');
-  if (typeof document.desejaContribuir !== 'boolean') missing.push('desejaContribuir');
-  if (typeof document.consignacao !== 'boolean') missing.push('consignacao');
-  if (typeof document.encarnado !== 'boolean') missing.push('encarnado');
-  if (typeof document.trabalharVoluntario !== 'boolean') missing.push('trabalharVoluntario');
+  if (!normalizeText(document.nome)) missing.push('nome');
+  if (target === 'permanent' && !normalizeText(document.numeroCruzado)) missing.push('numeroCruzado');
 
   return { ok: missing.length === 0, missing };
 };
@@ -173,6 +175,7 @@ const createSummary = () => ({
   read: 0,
   valid: 0,
   imported: 0,
+  withoutCpf: 0,
   updated: 0,
   errors: 0,
   skipped: 0,
@@ -181,6 +184,7 @@ const createSummary = () => ({
 
 const resolveModel = (target) => (target === 'permanent' ? Cruzado : CruzadoTemp);
 
+// Remove undefined (o Mongo ignora undefined), mantém null para campos ausentes
 const stripUndefined = (value) => Object.fromEntries(
   Object.entries(value).filter(([, entry]) => entry !== undefined)
 );
@@ -194,7 +198,7 @@ const importRows = async (rows, options = {}) => {
 
   for (const [index, row] of rows.entries()) {
     const document = buildDocument(row, index + 2, target);
-    const validation = validateDocument(document);
+    const validation = validateDocument(document, { target });
 
     if (!validation.ok) {
       summary.skipped += 1;
@@ -204,35 +208,65 @@ const importRows = async (rows, options = {}) => {
 
     summary.valid += 1;
 
+    // Contabilizar registros sem CPF (fluxo legado)
+    if (!document.cpf) {
+      summary.withoutCpf += 1;
+    }
+
     if (dryRun) {
       continue;
     }
 
     try {
-      const cpfExists = await Model.findOne({ cpf: document.cpf });
-      if (cpfExists) {
+      // Buscar duplicidade: preferir CPF quando existir; senão usar numeroCruzado
+      let existing = null;
+      if (document.cpf) {
+        existing = await Model.findOne({ cpf: document.cpf });
+      }
+      if (!existing && document.numeroCruzado) {
+        existing = await Model.findOne({ numeroCruzado: document.numeroCruzado });
+      }
+
+      if (existing) {
         const updatePayload = stripUndefined({
           ...document,
+          _id: undefined,
+          rowNumber: undefined,
+          cpf: document.cpf || existing.cpf || null,
+          numeroCruzado: document.numeroCruzado || existing.numeroCruzado || null,
           updatedAt: new Date(),
           status: target === 'permanent' ? 'aprovado' : 'pendente',
-          createdAt: cpfExists.createdAt || document.createdAt
+          createdAt: existing.createdAt || document.createdAt
         });
 
-        await Model.findOneAndUpdate(
-          { cpf: document.cpf },
+        await Model.updateOne(
+          { _id: existing._id },
           { $set: updatePayload },
-          { new: true }
+          { runValidators: false }
         );
 
         summary.updated += 1;
         continue;
       }
 
-      await Model.create(document);
+      // Criar registro com campos vazios como null
+      const docToCreate = stripUndefined({
+        ...document,
+        rowNumber: undefined,
+        _id: undefined
+      });
+
+      await Model.create(docToCreate);
       summary.imported += 1;
     } catch (error) {
-      summary.errors += 1;
-      summary.invalidRows.push({ row: document.rowNumber, reason: error.message });
+      // Duplicidade por índice parcial (ex.: mesmo numeroCruzado importado duas vezes na mesma leva)
+      if (error.code === 11000) {
+        summary.errors += 1;
+        summary.invalidRows.push({ row: document.rowNumber, reason: `Duplicado (${error.message})` });
+      } else {
+        summary.errors += 1;
+        summary.invalidRows.push({ row: document.rowNumber, reason: error.message });
+      }
     }
   }
 
@@ -273,6 +307,7 @@ const printSummary = (summary) => {
   console.log(`Válidas: ${summary.valid}`);
   console.log(`Importadas: ${summary.imported}`);
   console.log(`Atualizadas: ${summary.updated}`);
+  console.log(`Sem CPF: ${summary.withoutCpf || 0}`);
   console.log(`Com erro: ${summary.errors}`);
   console.log(`Ignoradas: ${summary.skipped}`);
 
@@ -293,3 +328,4 @@ module.exports = {
   importFromFile,
   printSummary,
 };
+

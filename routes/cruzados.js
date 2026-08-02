@@ -141,6 +141,42 @@ const cruzadoSchema = Joi.object({
   trabalharVoluntario: Joi.boolean().optional()
 });
 
+// Schema de atualização flexível (aceita registros legados sem CPF/email)
+const cruzadoUpdateSchema = Joi.object({
+  nome: Joi.string().allow('').optional(),
+  cpf: Joi.string().allow('').optional(),
+  celular: Joi.string().allow('').optional(),
+  email: Joi.string().email().allow('').optional(),
+  estado: Joi.string().allow('').optional(),
+  cidade: Joi.string().allow('').optional(),
+  endereco: Joi.string().allow('').optional(),
+  cep: Joi.string().allow('').optional(),
+  sexo: Joi.string().valid('masculino', 'feminino').allow('').optional(),
+  dataNascimento: Joi.date().allow('').optional(),
+  vinculoProfissional: Joi.string().valid('Marinha', 'Exército', 'Força Aérea', 'Polícia Militar', 'Corpo de Bombeiros Militar', 'Civil', 'Outros').allow('').optional(),
+  especificarVinculo: Joi.string().allow('').optional(),
+  situacaoProfissional: Joi.string().valid('Ativa', 'Reserva', 'Reformado', 'Aposentado', 'Pensionista', 'Outros').allow('').optional(),
+  especificarSituacao: Joi.string().allow('').optional(),
+  formacao: Joi.string().valid('fundamental', 'medio', 'superior', 'mestre', 'doutor').allow('').optional(),
+  nucleoOuGede: Joi.string().allow('').optional(),
+  nomeResponsavelIndicacao: Joi.string().allow('').optional(),
+  cpfResponsavelIndicacao: Joi.string().allow('').optional(),
+  desejaContribuir: Joi.boolean().optional(),
+  valorContribuicao: Joi.number().optional(),
+  consignacao: Joi.boolean().optional(),
+  numeroCruzado: Joi.string().allow('').optional(),
+  encarnado: Joi.boolean().optional(),
+  trabalharVoluntario: Joi.boolean().optional()
+});
+
+// Helpers de normalização de CPF
+const normalizeCpf = (cpf) => String(cpf || '').replace(/\D/g, '');
+const buildCpfRegex = (cpfDigits) => {
+  const digits = String(cpfDigits || '').replace(/\D/g, '');
+  const pattern = '^' + digits.split('').map((digit) => `${digit}\\D*`).join('') + '$';
+  return new RegExp(pattern);
+};
+
 // Submeter formulário
 router.post('/register', upload, async (req, res) => {
   try {
@@ -682,37 +718,46 @@ router.post('/import/excel', authenticate, authorize('admin', 'secretario'), (re
   });
 });
 
-// Buscar Cruzado por CPF (para edição)
+// Buscar Cruzado por CPF ou número de cruzado (para edição)
 router.get('/buscar', async (req, res) => {
   try {
     const cpfQuery = req.query.cpf;
+    const numeroCruzadoQuery = (req.query.numeroCruzado || req.query.numero || '').trim();
 
-    if (!cpfQuery) {
-      return res.status(400).json({ message: 'CPF inválido!' });
+    if (!cpfQuery && !numeroCruzadoQuery) {
+      return res.status(400).json({ message: 'Informe CPF ou Número Cruzado!' });
     }
 
-    // 1) Tentar busca EXATA pelo valor salvo (útil se o banco guarda CPF formatado)
+    // 1) Buscar por numeroCruzado (chave principal dos registros legados)
+    if (numeroCruzadoQuery) {
+      const cruzadoPorNumero = await Cruzado.findOne({ numeroCruzado: numeroCruzadoQuery });
+      if (cruzadoPorNumero) return res.json(cruzadoPorNumero);
+    }
+
+    if (!cpfQuery) {
+      return res.status(404).json({ message: 'Cadastro não encontrado!' });
+    }
+
+    // 2) Tentar busca EXATA pelo valor salvo (útil se o banco guarda CPF formatado)
     let cruzado = await Cruzado.findOne({ cpf: cpfQuery });
     if (cruzado) return res.json(cruzado);
 
-    // 2) Tentar buscar por versão sem formatação (somente dígitos)
+    // 3) Tentar buscar por versão sem formatação (somente dígitos)
     const cpfLimpo = cpfQuery.replace(/\D/g, '');
     if (cpfLimpo && cpfLimpo.length === 11) {
       cruzado = await Cruzado.findOne({ cpf: cpfLimpo });
       if (cruzado) return res.json(cruzado);
     }
 
-    // 3) Fallback mais robusto: comparar CPF usando regex compatível
+    // 4) Fallback mais robusto: comparar CPF usando regex compatível
     try {
-      cruzado = await Cruzado.findOne({ cpf: new RegExp('^' + cpfLimpo.split('').map(d => `${d}\\D*`).join('') + '$') });
+      cruzado = await Cruzado.findOne({ cpf: buildCpfRegex(cpfLimpo) });
       if (cruzado) return res.json(cruzado);
     } catch (e) {
       // Ignorar; já tentamos os casos exatos e sem formatação
     }
 
     return res.status(404).json({ message: 'Cadastro não encontrado!' });
-
-    res.json(cruzado);
   } catch (err) {
     console.error('Erro ao buscar Cruzado:', err);
     res.status(500).json({ message: 'Erro ao buscar cadastro. Tente novamente.' });
@@ -750,8 +795,8 @@ router.put('/atualizar/:id', upload, verifyEditToken, async (req, res) => {
 
     sanitize(req.body);
 
-    // Validar dados
-    const { error } = cruzadoSchema.validate(req.body);
+    // Validar dados com schema flexível (aceita registros legados sem CPF/email)
+    const { error } = cruzadoUpdateSchema.validate(req.body);
     if (error) {
       const field = error.details[0].context.label || error.details[0].path[0];
       return res.status(400).json({ message: `Campo inválido: ${field}. ${error.details[0].message}` });
@@ -763,18 +808,18 @@ router.put('/atualizar/:id', upload, verifyEditToken, async (req, res) => {
       return res.status(404).json({ message: 'Cadastro não encontrado!' });
     }
 
-    // Verificar se novo CPF já existe (se foi alterado) — comparar CPFs sem formatação
-    const cpfNovoLimpo = req.body.cpf ? req.body.cpf.replace(/\D/g, '') : '';
-    const cpfExistenteLimpo = cruzadoExistente.cpf ? cruzadoExistente.cpf.replace(/\D/g, '') : '';
-    if (cpfNovoLimpo !== cpfExistenteLimpo) {
-      const cpfJaExiste = await Cruzado.findOne({ cpf: new RegExp('^' + cpfNovoLimpo.split('').map(d => `${d}\\D*`).join('') + '$') });
+    // Verificar se novo CPF já existe (se foi alterado) — somente se CPF foi informado
+    const cpfNovoLimpo = req.body.cpf ? normalizeCpf(req.body.cpf) : '';
+    const cpfExistenteLimpo = cruzadoExistente.cpf ? normalizeCpf(cruzadoExistente.cpf) : '';
+    if (cpfNovoLimpo && cpfNovoLimpo !== cpfExistenteLimpo) {
+      const cpfJaExiste = await Cruzado.findOne({ cpf: buildCpfRegex(cpfNovoLimpo) });
       if (cpfJaExiste) {
         return res.status(400).json({ message: 'CPF já cadastrado no sistema!' });
       }
     }
 
-    // Verificar se novo email já existe (se foi alterado)
-    if (req.body.email !== cruzadoExistente.email) {
+    // Verificar se novo email já existe (se foi alterado) — somente se email foi informado
+    if (req.body.email && req.body.email !== cruzadoExistente.email) {
       const emailJaExiste = await Cruzado.findOne({ email: req.body.email });
       if (emailJaExiste) {
         return res.status(400).json({ message: 'Email já cadastrado no sistema!' });

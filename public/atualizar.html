@@ -12,10 +12,11 @@
     
     <div id="buscaForm">
       <h2>Verificação de Identidade</h2>
-      <p>Para atualizar seu cadastro, insira apenas o CPF cadastrado:</p>
+      <p>Para atualizar seu cadastro, informe o CPF ou o Número Cruzado cadastrado:</p>
       
-      <label for="cpfBusca">CPF:</label>
-      <input type="text" id="cpfBusca" placeholder="000.000.000-00" required>
+      <label for="cpfBusca">CPF ou Número Cruzado:</label>
+      <input type="text" id="cpfBusca" placeholder="000.000.000-00 ou número (ex: 8001)" required>
+      <small style="color: #666;">Se informar o número, não é necessário preencher o CPF.</small>
       
       <button id="buscarBtn">Buscar Cadastro</button>
 
@@ -31,6 +32,20 @@
           <button type="button" id="verificarCodigoBtn" style="margin-top: 10px;">✅ Verificar código</button>
           <p id="statusCodigo" style="margin-top: 10px; color: #666;"></p>
         </div>
+      </div>
+
+      <div id="semEmailForm" style="display:none; margin-top: 18px; padding: 14px; border: 1px solid #e67e22; border-radius: 6px; background: #fef9f0;">
+        <h3 style="margin-top: 0; color: #c0392b;">Cadastro sem e-mail</h3>
+        <p style="margin-top: 4px;">Este cadastro não possui e-mail. Para liberar a atualização, informe seu <strong>nome completo</strong> e o <strong>número cruzado</strong> para validação.</p>
+
+        <label for="nomeSemEmail">Nome completo:</label>
+        <input type="text" id="nomeSemEmail" placeholder="Seu nome completo" style="margin-bottom: 8px;">
+
+        <label for="numeroSemEmail">Número Cruzado:</label>
+        <input type="text" id="numeroSemEmail" placeholder="Ex: 8001" style="margin-bottom: 8px;">
+
+        <button type="button" id="validarSemEmailBtn">🔓 Liberar edição (sem e-mail)</button>
+        <p id="statusSemEmail" style="margin-top: 10px; color: #666;"></p>
       </div>
 
       <p style="margin-top: 20px; text-align: center;">

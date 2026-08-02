@@ -176,10 +176,16 @@ async function importarPlanilhaExcel() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.xlsx,.xls';
+  input.style.display = 'none';
+  document.body.appendChild(input);
 
   input.onchange = async () => {
     const arquivo = input.files && input.files[0];
-    if (!arquivo) return;
+    input.value = '';
+    if (!arquivo) {
+      document.body.removeChild(input);
+      return;
+    }
 
     const formData = new FormData();
     formData.append('arquivo', arquivo);
@@ -199,10 +205,21 @@ async function importarPlanilhaExcel() {
       }
 
       const summary = result.summary || {};
-      alert(`✅ ${result.message}\nImportadas: ${summary.imported || 0}\nAtualizadas: ${summary.updated || 0}\nVálidas: ${summary.valid || 0}\nIgnoradas: ${summary.skipped || 0}\nErros: ${summary.errors || 0}`);
+      alert(`✅ ${result.message}\n` +
+        `Linhas lidas: ${summary.read || 0}\n` +
+        `Importadas: ${summary.imported || 0}\n` +
+        `Atualizadas: ${summary.updated || 0}\n` +
+        `Sem CPF: ${summary.withoutCpf || 0}\n` +
+        `Válidas: ${summary.valid || 0}\n` +
+        `Ignoradas: ${summary.skipped || 0}\n` +
+        `Erros: ${summary.errors || 0}`);
       refreshPendingLists();
     } catch (error) {
       alert('❌ Erro de conexão: ' + error.message);
+    } finally {
+      if (input.parentNode) {
+        input.parentNode.removeChild(input);
+      }
     }
   };
 
@@ -365,3 +382,4 @@ async function updateStatusConsignacao(id, status) {
     alert('❌ Erro de conexão: ' + error.message);
   }
 }
+
