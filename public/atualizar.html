@@ -60,13 +60,13 @@
 
       <div id="buscaCpfPanel" class="aba-painel">
         <label for="cpfBusca">CPF:</label>
-        <input type="text" id="cpfBusca" placeholder="000.000.000-00" required>
+        <input type="text" id="cpfBusca" placeholder="000.000.000-00" >
         <small style="color: #666;">Informe o CPF cadastrado (11 dígitos).</small>
       </div>
 
       <div id="buscaNumeroPanel" class="aba-painel" style="display: none;">
         <label for="numeroBusca">Número Cruzado:</label>
-        <input type="text" id="numeroBusca" placeholder="Ex: 8001" required>
+        <input type="text" id="numeroBusca" placeholder="Ex: 8001" >
         <small style="color: #666;">Informe o número cruzado impresso na carteirinha.</small>
       </div>
       
@@ -109,19 +109,19 @@
       <form id="formAtualizacao" enctype="multipart/form-data">
         <h2>Informações Pessoais</h2>
         <label for="nome">Nome:</label>
-        <input type="text" id="nome" name="nome" required>
+        <input type="text" id="nome" name="nome" >
 
         <label for="cpf">CPF:</label>
-        <input type="text" id="cpf" name="cpf" readonly style="background-color: #f0f0f0; cursor: not-allowed;">
+        <input type="text" id="cpf" name="cpf">
 
         <label for="celular">Celular:</label>
-        <input type="text" id="celular" name="celular" required>
+        <input type="text" id="celular" name="celular" >
 
         <label for="email">E-mail:</label>
-        <input type="email" id="email" name="email" required>
+        <input type="email" id="email" name="email" >
 
         <label for="estado">Estado (residência):</label>
-        <select id="estado" name="estado" required>
+        <select id="estado" name="estado" >
           <option value="">-- Selecione um Estado --</option>
           <option value="AC">Acre (AC)</option>
           <option value="AL">Alagoas (AL)</option>
@@ -153,29 +153,29 @@
         </select>
 
         <label for="cidade">Cidade (residência):</label>
-        <input type="text" id="cidade" name="cidade" required>
+        <input type="text" id="cidade" name="cidade" >
 
         <label for="endereco">Endereço (residência):</label>
-        <input type="text" id="endereco" name="endereco" required>
+        <input type="text" id="endereco" name="endereco" >
 
         <label for="cep">CEP (residência):</label>
-        <input type="text" id="cep" name="cep" required>
+        <input type="text" id="cep" name="cep" >
 
         <label for="sexo">Sexo:</label>
-        <select id="sexo" name="sexo" required>
+        <select id="sexo" name="sexo" >
           <option value="masculino">Masculino</option>
           <option value="feminino">Feminino</option>
         </select>
 
         <label for="dataNascimento">Data de nascimento:</label>
-        <input type="date" id="dataNascimento" name="dataNascimento" readonly style="background-color: #f0f0f0; cursor: not-allowed;">
+        <input type="date" id="dataNascimento" name="dataNascimento">
 
         <label for="foto">Foto:</label>
         <input type="file" id="foto" name="foto" accept="image/*">
         <small id="fotoInfo" style="color: #666;"></small>
 
         <label for="encarnado">Encarnado?</label>
-        <select id="encarnado" name="encarnado" required>
+        <select id="encarnado" name="encarnado" >
           <option value="true">Sim</option>
           <option value="false">Não</option>
         </select>
@@ -183,7 +183,7 @@
         <h2>Informações Profissionais</h2>
 
         <label for="vinculoProfissional">Vínculo profissional:</label>
-        <select id="vinculoProfissional" name="vinculoProfissional" required>
+        <select id="vinculoProfissional" name="vinculoProfissional" >
           <option value="Marinha">Marinha</option>
           <option value="Exército">Exército</option>
           <option value="Força Aérea">Força Aérea</option>
@@ -199,7 +199,7 @@
         </div>
 
         <label for="situacaoProfissional">Situação profissional:</label>
-        <select id="situacaoProfissional" name="situacaoProfissional" required>
+        <select id="situacaoProfissional" name="situacaoProfissional" >
           <option value="Ativa">Ativa</option>
           <option value="Reserva">Reserva</option>
           <option value="Reformado">Reformado</option>
@@ -214,7 +214,7 @@
         </div>
 
         <label for="formacao">Formação:</label>
-        <select id="formacao" name="formacao" required>
+        <select id="formacao" name="formacao" >
           <option value="fundamental">Fundamental</option>
           <option value="medio">Médio</option>
           <option value="superior">Superior</option>
@@ -222,19 +222,25 @@
           <option value="doutor">Doutor</option>
         </select>
 
-        <h2>Informações de Indicação</h2>
+<h2>Informações de Indicação</h2>
 
         <label for="nucleoOuGede">Qual núcleo ou GEDE que frequenta?</label>
-        <input type="text" id="nucleoOuGede" name="nucleoOuGede" required>
+        <input type="text" id="nucleoOuGede" name="nucleoOuGede" >
 
-        <!-- Campos do responsável removidos da interface mas mantidos como hidden para validação do backend -->
-        <input type="hidden" id="nomeResponsavelIndicacao" name="nomeResponsavelIndicacao">
-        <input type="hidden" id="cpfResponsavelIndicacao" name="cpfResponsavelIndicacao">
+        <label for="nomeResponsavelIndicacao">Nome do responsável pela indicação:</label>
+        <input type="text" id="nomeResponsavelIndicacao" name="nomeResponsavelIndicacao">
+
+        <label for="cpfResponsavelIndicacao">CPF do responsável pela indicação:</label>
+        <input type="text" id="cpfResponsavelIndicacao" name="cpfResponsavelIndicacao">
+
+        <label for="certificadoIndicacao">Certificado de Indicação (PDF):</label>
+        <input type="file" id="certificadoIndicacao" name="certificadoIndicacao" accept="application/pdf">
+        <small id="certificadoIndicacaoInfo" style="color: #666;"></small>
 
         <h2>Contribuição</h2>
 
         <label for="desejaContribuir">Deseja contribuir financeiramente?</label>
-        <select id="desejaContribuir" name="desejaContribuir" required>
+        <select id="desejaContribuir" name="desejaContribuir" >
           <option value="false">Não</option>
           <option value="true">Sim</option>
         </select>
@@ -249,12 +255,30 @@
             <option value="true">Sim</option>
           </select>
 
-          <div id="consignacaoDocumentoContainer" style="display: none; margin-top: 10px;">
+<div id="consignacaoDocumentoContainer" style="display: none; margin-top: 10px;">
             <p style="margin-top: 8px; color: #666;">Para consignação em folha, baixe o termo, preencha e envie o PDF assinado:</p>
             <a href="TERMO_CONSIGNACAO.docx" download style="display: inline-block; margin-bottom: 10px; padding: 10px 20px; background-color: #27ae60; color: white; text-decoration: none; border-radius: 4px;">📥 Baixar Termo de Consignação</a>
             <label for="documentoConsignacao">Enviar termo de consignação em folha (PDF):</label>
             <input type="file" id="documentoConsignacao" name="documentoConsignacao" accept="application/pdf">
           </div>
+        </div>
+
+        <h2>Trabalho Voluntário</h2>
+
+        <label for="trabalharVoluntario">Deseja trabalhar como voluntário?</label>
+        <select id="trabalharVoluntario" name="trabalharVoluntario" >
+          <option value="false">Não</option>
+          <option value="true">Sim</option>
+        </select>
+
+        <div id="voluntarioContainer" style="display: none;">
+          <p style="margin-top: 10px; color: #666;">Para trabalhar como voluntário, baixe o termo, preencha, assinale e envie:</p>
+          <div style="display: flex; gap: 10px; align-items: center; margin: 10px 0;">
+            <a href="TERMO_DE_ADESAO_VOLUNTARIO.docx" download style="padding: 10px 20px; background-color: #e74c3c; color: white; text-decoration: none; border-radius: 4px;">📥 Baixar Termo de Adesão</a>
+          </div>
+          <label for="documentoVoluntario">Enviar Termo de Adesão assinado (PDF):</label>
+          <input type="file" id="documentoVoluntario" name="documentoVoluntario" accept="application/pdf">
+          <small id="documentoVoluntarioInfo" style="color: #666;"></small>
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: 20px;">

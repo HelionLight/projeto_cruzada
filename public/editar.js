@@ -64,9 +64,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const cpfBuscaInput = document.getElementById('cpfBusca');
   const cpfInput = document.getElementById('cpf');
   const celularInput = document.getElementById('celular');
+  const cpfResponsavelInput = document.getElementById('cpfResponsavelIndicacao');
   const vinculoSelect = document.getElementById('vinculoProfissional');
   const situacaoSelect = document.getElementById('situacaoProfissional');
   const desejaContribuirSelect = document.getElementById('desejaContribuir');
+  const trabalharVoluntarioSelect = document.getElementById('trabalharVoluntario');
 
   // Alternância de abas (CPF / Número Cruzado)
   const tabCpf = document.getElementById('tabCpf');
@@ -305,10 +307,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Formatação de Celular
+// Formatação de Celular
   if (celularInput) {
     celularInput.addEventListener('input', (e) => {
       e.target.value = formatarCelular(e.target.value);
+    });
+  }
+
+  // Formatação de CPF do responsável pela indicação
+  if (cpfResponsavelInput) {
+    cpfResponsavelInput.addEventListener('input', (e) => {
+      e.target.value = formatarCPF(e.target.value);
+    });
+  }
+
+  // Campos condicionais - Trabalho Voluntário
+  if (trabalharVoluntarioSelect) {
+    trabalharVoluntarioSelect.addEventListener('change', () => {
+      const container = document.getElementById('voluntarioContainer');
+      if (trabalharVoluntarioSelect.value === 'true') {
+        container.style.display = 'block';
+      } else {
+        container.style.display = 'none';
+        const docInput = document.getElementById('documentoVoluntario');
+        if (docInput) docInput.value = '';
+      }
     });
   }
 
@@ -499,19 +522,24 @@ function preencherFormulario(cruzado) {
   document.getElementById('situacaoProfissional').value = cruzado.situacaoProfissional || '';
   document.getElementById('especificarSituacao').value = cruzado.especificarSituacao || '';
   document.getElementById('formacao').value = cruzado.formacao || '';
-  document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
-  // Campos do responsável preenchidos como hidden (não aparecem na interface)
+document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
   document.getElementById('nomeResponsavelIndicacao').value = cruzado.nomeResponsavelIndicacao || '';
-  document.getElementById('cpfResponsavelIndicacao').value = cruzado.cpfResponsavelIndicacao || '';
+  document.getElementById('cpfResponsavelIndicacao').value = formatarCPF(cruzado.cpfResponsavelIndicacao) || '';
   document.getElementById('desejaContribuir').value = cruzado.desejaContribuir ? 'true' : 'false';
   document.getElementById('valorContribuicao').value = cruzado.valorContribuicao || '';
   document.getElementById('consignacao').value = cruzado.consignacao ? 'true' : 'false';
+  document.getElementById('trabalharVoluntario').value = cruzado.trabalharVoluntario ? 'true' : 'false';
 
   // Mostrar informações de arquivos existentes
   if (cruzado.foto) {
     document.getElementById('fotoInfo').textContent = '📷 Foto já existente (deixe em branco para não alterar)';
   }
-  // certificadoIndicacao removido das atualizações
+  if (cruzado.certificadoIndicacao) {
+    document.getElementById('certificadoIndicacaoInfo').textContent = '📄 Certificado já existente (deixe em branco para não alterar)';
+  }
+  if (cruzado.documentoVoluntario) {
+    document.getElementById('documentoVoluntarioInfo').textContent = '📄 Termo já existente (deixe em branco para não alterar)';
+  }
 
   // Ativar campos condicionais
   if (cruzado.vinculoProfissional === 'Outros') {
@@ -525,6 +553,9 @@ function preencherFormulario(cruzado) {
   }
   if (cruzado.consignacao) {
     document.getElementById('consignacaoDocumentoContainer').style.display = 'block';
+  }
+  if (cruzado.trabalharVoluntario) {
+    document.getElementById('voluntarioContainer').style.display = 'block';
   }
 }
 
@@ -604,8 +635,11 @@ function limparFormulario() {
   const fotoInfo = document.getElementById('fotoInfo'); if (fotoInfo) fotoInfo.textContent = '';
   const ev = document.getElementById('especificarVinculoContainer'); if (ev) ev.style.display = 'none';
   const es = document.getElementById('especificarSituacaoContainer'); if (es) es.style.display = 'none';
-  const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.display = 'none';
+const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.display = 'none';
   const cd = document.getElementById('consignacaoDocumentoContainer'); if (cd) cd.style.display = 'none';
+  const vc = document.getElementById('voluntarioContainer'); if (vc) vc.style.display = 'none';
+  const certInfo = document.getElementById('certificadoIndicacaoInfo'); if (certInfo) certInfo.textContent = '';
+  const volInfo = document.getElementById('documentoVoluntarioInfo'); if (volInfo) volInfo.textContent = '';
   const codigoInput = document.getElementById('codigo');
   const statusCodigo = document.getElementById('statusCodigo');
   if (codigoInput) codigoInput.value = '';

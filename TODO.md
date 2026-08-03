@@ -1,24 +1,20 @@
-# TODO - Migração da base legada
+# TODO - Tornar todos os campos editáveis na página Atualizar Cadastro
 
-## Etapas de implementação
+## 1. `public/atualizar.html`
+- [ ] Remover `readonly` do campo CPF
+- [ ] Remover `readonly` do campo Data de nascimento
+- [ ] Tornar visíveis os campos do responsável pela indicação (nome + CPF)
+- [ ] Adicionar campo de upload de `certificadoIndicacao`
+- [ ] Adicionar seção "Trabalho Voluntário" (trabalharVoluntario + documentoVoluntario)
 
-- [x] 1. Ler o arquivo de instruções e entender o sistema
-- [x] 2. Ajustar `models/Cruzado.js` (campos opcionais + índices parciais)
-- [x] 3. Ajustar `models/EmailVerificationToken.js` (suporte a numeroCruzado)
-- [x] 4. Ajustar `utils/legacyImport.js` (validação leniente, dataAprovacao, dedupe por numeroCruzado)
-- [x] 5. Ajustar `routes/cruzados.js` (busca por numeroCruzado, schema flexível de atualização, rotas legado)
-- [x] 6. Ajustar `routes/emailVerification.js` (request/verify por numeroCruzado, fluxo sem email)
-- [x] 7. Ajustar `middleware/verifyEditToken.js` (aceitar numeroCruzado)
-- [x] 8. Ajustar `server.js` (corrigir índice único antigo do CPF)
-- [x] 9. Ajustar `public/atualizar.html` (busca por CPF/número + fluxo sem e-mail)
-- [x] 10. Ajustar `public/editar.js` (busca por numeroCruzado, fluxo legado)
-- [x] 11. Ajustar `public/admin.js` (alertas de importação) + contador `withoutCpf` no summary
-- [ ] 12. Testar importação, busca e atualização
+## 2. `public/editar.js`
+- [ ] Adicionar formatação de CPF para o campo `cpfResponsavelIndicacao`
+- [ ] Adicionar lógica condicional de mostrar/ocultar a seção voluntário
+- [ ] Atualizar `preencherFormulario` para preencher os novos campos e exibir contêineres condicionais
+- [ ] Atualizar `limparFormulario` para resetar a seção voluntário
+- [ ] Limpar CPF do responsável na validação de salvamento
 
-## Critérios de aceite
-- Importar a base antiga pelo botão do admin.
-- Gravar direto na collection `cruzados` (mesma do cadastro novo).
-- Aceitar campos ausentes como `null`/vazios.
-- Buscar e atualizar registros legados por `numeroCruzado`.
-- Não quebrar o cadastro novo.
+## 3. `routes/cruzados.js` (handler `atualizar/:id`)
+- [ ] Processar upload de `documentoVoluntario`
+- [ ] Salvar `documentoVoluntario` na atualização
 
