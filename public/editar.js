@@ -1,6 +1,7 @@
 // Formatação de CPF
 function formatarCPF(cpf) {
-  const cpfLimpo = cpf.replace(/\D/g, '');
+  if (!cpf) return '';
+  const cpfLimpo = String(cpf).replace(/\D/g, '');
   if (cpfLimpo.length <= 3) {
     return cpfLimpo;
   } else if (cpfLimpo.length <= 6) {
@@ -14,7 +15,8 @@ function formatarCPF(cpf) {
 
 // Formatação de Celular
 function formatarCelular(celular) {
-  const celularLimpo = celular.replace(/\D/g, '');
+  if (!celular) return '';
+  const celularLimpo = String(celular).replace(/\D/g, '');
   if (celularLimpo.length <= 2) {
     return '(' + celularLimpo;
   } else if (celularLimpo.length <= 7) {
