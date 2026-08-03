@@ -5,6 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atualizar Cadastro - Cruzada</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    .aba-container {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0 12px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .aba-btn {
+      padding: 10px 20px;
+      border: none;
+      background: #f1f5f9;
+      cursor: pointer;
+      font-size: 0.95rem;
+      border-radius: 8px 8px 0 0;
+      color: #475569;
+      transition: background 0.2s;
+    }
+    .aba-btn:hover {
+      background: #e2e8f0;
+    }
+    .aba-btn.ativa {
+      background: #3498db;
+      color: #ffffff;
+      font-weight: bold;
+    }
+    .aba-painel {
+      margin-bottom: 14px;
+    }
+    .aba-painel label {
+      display: block;
+      margin: 8px 0 4px;
+      font-weight: 600;
+    }
+    .aba-painel input {
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+  </style>
 </head>
 <body>
   <div class="container">
@@ -12,11 +51,24 @@
     
     <div id="buscaForm">
       <h2>Verificação de Identidade</h2>
-      <p>Para atualizar seu cadastro, informe o CPF ou o Número Cruzado cadastrado:</p>
-      
-      <label for="cpfBusca">CPF ou Número Cruzado:</label>
-      <input type="text" id="cpfBusca" placeholder="000.000.000-00 ou número (ex: 8001)" required>
-      <small style="color: #666;">Se informar o número, não é necessário preencher o CPF.</small>
+      <p>Para atualizar seu cadastro, escolha uma das opções abaixo:</p>
+
+      <div class="aba-container">
+        <button type="button" id="tabCpf" class="aba-btn ativa">CPF</button>
+        <button type="button" id="tabNumero" class="aba-btn">Número Cruzado</button>
+      </div>
+
+      <div id="buscaCpfPanel" class="aba-painel">
+        <label for="cpfBusca">CPF:</label>
+        <input type="text" id="cpfBusca" placeholder="000.000.000-00" required>
+        <small style="color: #666;">Informe o CPF cadastrado (11 dígitos).</small>
+      </div>
+
+      <div id="buscaNumeroPanel" class="aba-painel" style="display: none;">
+        <label for="numeroBusca">Número Cruzado:</label>
+        <input type="text" id="numeroBusca" placeholder="Ex: 8001" required>
+        <small style="color: #666;">Informe o número cruzado impresso na carteirinha.</small>
+      </div>
       
       <button id="buscarBtn">Buscar Cadastro</button>
 

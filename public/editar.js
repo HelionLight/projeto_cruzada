@@ -68,6 +68,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const situacaoSelect = document.getElementById('situacaoProfissional');
   const desejaContribuirSelect = document.getElementById('desejaContribuir');
 
+  // Alternância de abas (CPF / Número Cruzado)
+  const tabCpf = document.getElementById('tabCpf');
+  const tabNumero = document.getElementById('tabNumero');
+  const cpfPanel = document.getElementById('buscaCpfPanel');
+  const numeroPanel = document.getElementById('buscaNumeroPanel');
+
+  const ativarAbaCpf = () => {
+    if (tabCpf) tabCpf.classList.add('ativa');
+    if (tabNumero) tabNumero.classList.remove('ativa');
+    if (cpfPanel) cpfPanel.style.display = 'block';
+    if (numeroPanel) numeroPanel.style.display = 'none';
+  };
+
+  const ativarAbaNumero = () => {
+    if (tabNumero) tabNumero.classList.add('ativa');
+    if (tabCpf) tabCpf.classList.remove('ativa');
+    if (numeroPanel) numeroPanel.style.display = 'block';
+    if (cpfPanel) cpfPanel.style.display = 'none';
+  };
+
+  if (tabCpf) tabCpf.addEventListener('click', ativarAbaCpf);
+  if (tabNumero) tabNumero.addEventListener('click', ativarAbaNumero);
+
   const codigoForm = document.getElementById('codigoForm');
   const solicitarCodigoBtn = document.getElementById('solicitarCodigoBtn');
   const verificarCodigoBtn = document.getElementById('verificarCodigoBtn');
@@ -377,7 +400,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function buscarCadastro() {
-  const valorBusca = document.getElementById('cpfBusca').value.trim();
+  // Lê o campo da aba ativa (CPF ou Número Cruzado)
+  const tabNumeroAtiva = document.getElementById('tabNumero')?.classList.contains('ativa');
+  const cpfValue = document.getElementById('cpfBusca').value.trim();
+  const numeroValue = document.getElementById('numeroBusca').value.trim();
+
+  const valorBusca = tabNumeroAtiva ? numeroValue : cpfValue;
   const apenasDigitos = valorBusca.replace(/\D/g, '');
 
   if (!valorBusca) {
@@ -389,62 +417,69 @@ async function buscarCadastro() {
   mostrarSemEmailForm(false);
   mostrarCodigoForm(false);
 
-  // Se parecer um número (sem letras) e não tiver 11 dígitos, tratar como numeroCruzado
-  const pareceNumero = /^[\d\s.\-]+$/.test(valorBusca);
-  const isCpf = apenasDigitos.length === 11;
-  const isNumeroCruzado = pareceNumero && !isCpf && apenasDigitos.length > 0;
-
-  try {
-    let url;
-    if (isNumeroCruzado) {
+  if (tabNumeroAtiva) {
+    // Aba Número Cruzado ativa: busca pelo número
+    try {
       url = `/api/cruzados/buscar?numeroCruzado=${encodeURIComponent(apenasDigitos)}`;
       numeroCruzadoBusca = apenasDigitos;
-    } else {
-      if (!isCpf) {
-        alert('❌ CPF inválido: insira um CPF com 11 dígitos.');
-        return;
-      }
-      url = `/api/cruzados/buscar?cpf=${encodeURIComponent(valorBusca)}`;
+      await executarBusca(url);
+    } catch (error) {
+      alert('❌ Erro ao buscar cadastro: ' + error.message);
     }
+    return;
+  }
 
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      alert('❌ Cadastro não encontrado. Verifique o CPF ou o Número Cruzado informado.');
-      return;
-    }
+  // Aba CPF ativa
+  const isCpf = apenasDigitos.length === 11;
+  if (!isCpf) {
+    alert('❌ CPF inválido: insira um CPF com 11 dígitos.');
+    return;
+  }
 
-    const cruzado = await response.json();
-
-    // Armazenar dados originais
-    cruzadoId = cruzado._id;
-    cruzadoOriginal = JSON.parse(JSON.stringify(cruzado));
-
-    // Preencher formulário
-    preencherFormulario(cruzado);
-
-    // Se não tiver e-mail, mostrar fluxo alternativo (nome + número)
-    if (!cruzado.email) {
-      mostrarSemEmailForm(true);
-      mostrarCodigoForm(false);
-      const numeroSemEmail = document.getElementById('numeroSemEmail');
-      if (numeroSemEmail) numeroSemEmail.value = cruzado.numeroCruzado || numeroCruzadoBusca || '';
-      const statusSemEmail = document.getElementById('statusSemEmail');
-      if (statusSemEmail) statusSemEmail.textContent = 'Cadastro localizado. Valide abaixo para liberar a edição.';
-      return;
-    }
-
-    // Com e-mail: mostrar etapa de validação por e-mail antes de liberar a edição
-    mostrarCodigoForm(true);
-    const codigoInputEl = document.getElementById('codigo');
-    if (codigoInputEl) codigoInputEl.value = '';
-    const statusCodigoEl = document.getElementById('statusCodigo');
-    if (statusCodigoEl) statusCodigoEl.textContent = '📩 Envie o código para liberar a edição.';
-
-    alert('✅ Cadastro encontrado! Envie o código recebido por e-mail para liberar a edição.');
+  try {
+    const url = `/api/cruzados/buscar?cpf=${encodeURIComponent(valorBusca)}`;
+    await executarBusca(url);
   } catch (error) {
     alert('❌ Erro ao buscar cadastro: ' + error.message);
   }
+}
+
+async function executarBusca(url) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    alert('❌ Cadastro não encontrado. Verifique o CPF ou o Número Cruzado informado.');
+    return;
+  }
+
+  const cruzado = await response.json();
+
+  // Armazenar dados originais
+  cruzadoId = cruzado._id;
+  cruzadoOriginal = JSON.parse(JSON.stringify(cruzado));
+
+  // Preencher formulário
+  preencherFormulario(cruzado);
+
+  // Se não tiver e-mail, mostrar fluxo alternativo (nome + número)
+  if (!cruzado.email) {
+    mostrarSemEmailForm(true);
+    mostrarCodigoForm(false);
+    const numeroSemEmail = document.getElementById('numeroSemEmail');
+    if (numeroSemEmail) numeroSemEmail.value = cruzado.numeroCruzado || numeroCruzadoBusca || '';
+    const statusSemEmail = document.getElementById('statusSemEmail');
+    if (statusSemEmail) statusSemEmail.textContent = 'Cadastro localizado. Valide abaixo para liberar a edição.';
+    return;
+  }
+
+  // Com e-mail: mostrar etapa de validação por e-mail antes de liberar a edição
+  mostrarCodigoForm(true);
+  const codigoInputEl = document.getElementById('codigo');
+  if (codigoInputEl) codigoInputEl.value = '';
+  const statusCodigoEl = document.getElementById('statusCodigo');
+  if (statusCodigoEl) statusCodigoEl.textContent = '📩 Envie o código para liberar a edição.';
+
+  alert('✅ Cadastro encontrado! Envie o código recebido por e-mail para liberar a edição.');
 }
 
 function preencherFormulario(cruzado) {
