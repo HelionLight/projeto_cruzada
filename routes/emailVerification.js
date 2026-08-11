@@ -6,27 +6,9 @@ const Cruzado = require('../models/Cruzado');
 const EmailVerificationToken = require('../models/EmailVerificationToken');
 const { authenticate } = require('../middleware/auth');
 
-const nodemailer = require('nodemailer');
+const { sendEmail, getEmailTransporter } = require('../utils/emailService');
 
 const router = express.Router();
-
-const getEmailTransporter = () => {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-
-  if (!smtpHost || !smtpUser || !smtpPass) return null;
-
-  return nodemailer.createTransport({
-    host: smtpHost,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
-    auth: {
-      user: smtpUser,
-      pass: smtpPass
-    }
-  });
-};
 
 const normalizeCpf = (cpf) => String(cpf || '').replace(/\D/g, '');
 
@@ -39,21 +21,6 @@ const buildCpfRegex = (cpfDigits) => {
 const formatarCodeLikeDigits = (s) => {
   // Garantir que o code não inclua caracteres estranhos (mantém simples)
   return String(s).replace(/\D/g, '').slice(0, 8);
-};
-
-const sendEmail = async ({ to, subject, text, html }) => {
-  const transporter = getEmailTransporter();
-  if (!transporter) {
-    throw new Error('SMTP não configurado. Configure SMTP_HOST/SMTP_USER/SMTP_PASS.');
-  }
-
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-    to,
-    subject,
-    text,
-    html
-  });
 };
 
 // Localizar cruzado por CPF (com fallbacks) ou numeroCruzado

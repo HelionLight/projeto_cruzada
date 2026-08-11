@@ -3,7 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const mongoose = require('mongoose');
 const XLSX = require('xlsx');
-const nodemailer = require('nodemailer');
 const QRCode = require('qrcode');
 const Cruzado = require('../models/Cruzado');
 const CruzadoTemp = require('../models/CruzadoTemp');
@@ -12,6 +11,7 @@ const verifyEditToken = require('../middleware/verifyEditToken');
 const Joi = require('joi');
 const CruzadoCounter = require('../models/CruzadoCounter');
 const { importFromBuffer } = require('../utils/legacyImport');
+const { sendEmail, getEmailTransporter, enviarAlertaSecretario } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -49,69 +49,6 @@ const uploadExcel = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }
 }).single('arquivo');
-
-// Configuração do envio de e-mail para o secretário
-const getEmailTransporter = () => {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-
-  if (!smtpHost || !smtpUser || !smtpPass) {
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    host: smtpHost,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
-    auth: {
-      user: smtpUser,
-      pass: smtpPass
-    }
-  });
-};
-
-const enviarAlertaSecretario = async () => {
-  const enabled = String(process.env.EMAIL_ALERT_ENABLED || 'true').toLowerCase() !== 'false';
-  if (!enabled) return;
-
-  const transporter = getEmailTransporter();
-  if (!transporter) {
-    console.log('Alerta por e-mail não enviado: SMTP não configurado.');
-    return;
-  }
-
-  try {
-    const pendentes = await CruzadoTemp.countDocuments({
-      status: { $in: ['pendente', 'aguardando_documentos'] }
-    });
-
-    const destinatario = process.env.SECRETARIO_EMAIL || process.env.EMAIL_USER || 'secretaria@cme.org.br';
-    const assunto = `Novo cadastro recebido - ${pendentes} pendente${pendentes === 1 ? '' : 's'}`;
-    const texto = `Olá, secretário(a)!\n\nUm novo cadastro foi realizado no sistema da Cruzada.\nAtualmente existem ${pendentes} cadastro(s) pendente(s) aguardando avaliação.\n\nAcesse o painel administrativo para revisar os registros.`;
-    const html = `
-      <div style="font-family: Arial, sans-serif;">
-        <h2>Novo cadastro recebido</h2>
-        <p>Olá, secretário(a)!</p>
-        <p>Um novo cadastro foi realizado no sistema da Cruzada.</p>
-        <p>Atualmente existem <strong>${pendentes}</strong> cadastro(s) pendente(s) aguardando avaliação.</p>
-        <p>Acesse o painel administrativo para revisar os registros.</p>
-      </div>
-    `;
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: destinatario,
-      subject: assunto,
-      text: texto,
-      html
-    });
-
-    console.log(`Alerta por e-mail enviado para ${destinatario}`);
-  } catch (err) {
-    console.error('Erro ao enviar alerta por e-mail:', err);
-  }
-};
 
 // Validação do formulário
 const cruzadoSchema = Joi.object({
@@ -420,8 +357,8 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
             </div>
           `;
 
-          await transporter.sendMail({
-            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+await transporter.sendMail({
+            from: process.env.GMAIL_USER,
             to: tempCruzado.email,
             subject: assuntoCandidato,
             text: textoCandidato + '\n\nAcesse: ' + carteirinhaUrl,
@@ -451,8 +388,8 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
             </div>
           `;
 
-          await transporter.sendMail({
-            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+await transporter.sendMail({
+            from: process.env.GMAIL_USER,
             to: temp.email,
             subject: assuntoCandidato,
             text: textoCandidato,
