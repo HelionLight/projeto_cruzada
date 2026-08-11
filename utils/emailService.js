@@ -1,20 +1,8 @@
-// Serviço de envio de e-mail via Gmail API (OAuth2)
-// Substitui o SMTP do Gmail, que foi descontinuado para apps/uso programático.
-//
-// Requer variáveis de ambiente (veja TODO.md):
-//   GMAIL_CLIENT_ID
-//   GMAIL_CLIENT_SECRET
-//   GMAIL_REFRESH_TOKEN
-//   GMAIL_USER  (o e-mail do remetente, ex.: voce@gmail.com)
-//
-// Opcional: EMAIL_ALERT_ENABLED (true/false) para alertas ao secretário.
-
+// Serviço de envio de e-mail via GMAIL API (HTTP Puro) - Corrigido para o Render
 const { google } = require('googleapis');
-const nodemailer = require('nodemailer');
 
-// Cria o transporter OAuth2 do Gmail usando o refresh token.
-// O access token é gerado/renovado automaticamente pelo googleapis.
-const getEmailTransporter = () => {
+// Função auxiliar para inicializar o cliente da API do Gmail
+const getGmailClient = () => {
   const clientId = process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
   const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
@@ -25,42 +13,68 @@ const getEmailTransporter = () => {
   }
 
   const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret);
-
-  // Define o refresh token para que o access token seja obtido automaticamente.
   oAuth2Client.setCredentials({ refresh_token: refreshToken });
 
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      type: 'OAuth2',
-      user,
-      clientId,
-      clientSecret,
-      refreshToken,
-      // O access token é resolvido automaticamente pelo nodemailer a partir do
-      // refresh token + clientId/clientSecret. Não é necessário preencher aqui.
-    }
-  });
+  // Retorna a instância da API autenticada
+  return google.gmail({ version: 'v1', auth: oAuth2Client });
 };
 
-// Envia um e-mail. Retorna true se enviado, false se não configurado.
+// Mantido apenas para não quebrar compatibilidade caso alguma rota use diretamente
+const getEmailTransporter = () => {
+  return getGmailClient();
+};
+
+// Envia um e-mail gerando o formato RFC 2822 exigido pela API do Gmail
 const sendEmail = async ({ to, subject, text, html }) => {
-  const transporter = getEmailTransporter();
-  if (!transporter) {
+  const gmail = getGmailClient();
+  if (!gmail) {
     throw new Error('Gmail API não configurado. Defina GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN e GMAIL_USER.');
   }
 
-  await transporter.sendMail({
-    from: process.env.GMAIL_USER,
-    to,
-    subject,
-    text,
-    html
+  const sender = process.env.GMAIL_USER;
+
+  // Monta o cabeçalho e corpo do e-mail manualmente no formato padrão MIME
+  const parts = [
+    `From: ${sender}`,
+    `To: ${to}`,
+    `Subject: =?utf-8?B?${Buffer.from(subject).toString('base64')}?=`, // Trata acentos no assunto
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/alternative; boundary="boundary_cruzada"',
+    '',
+    '--boundary_cruzada',
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(text).toString('base64'),
+    '',
+    '--boundary_cruzada',
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(html).toString('base64'),
+    '',
+    '--boundary_cruzada--'
+  ];
+
+  const rawMessage = parts.join('\n');
+
+  // A API do Gmail exige que a string seja encodada em Base64 de formato Web (Safe URL)
+  const encodedMessage = Buffer.from(rawMessage)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  // Envia através da requisição HTTP POST oficial da API
+  await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: {
+      raw: encodedMessage,
+    },
   });
 };
 
 // Alerta ao secretário sobre novo cadastro/voluntário pendente.
-// Não lança erro se o e-mail não estiver configurado ou falhar.
 const enviarAlertaSecretario = async (qtdPendentes = 0) => {
   const enabled = String(process.env.EMAIL_ALERT_ENABLED || 'true').toLowerCase() !== 'false';
   if (!enabled) return;
