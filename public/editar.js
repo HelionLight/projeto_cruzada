@@ -31,6 +31,21 @@ let cruzadoOriginal = null;
 let editToken = null;
 let numeroCruzadoBusca = '';
 
+function mostrarLinkCarteirinha(cruzado) {
+  const container = document.getElementById('carteirinhaLinkContainer');
+  const link = document.getElementById('carteirinhaLink');
+  const numeroCruzado = cruzado?.numeroCruzado;
+  if (!container || !link) return;
+
+  if (numeroCruzado) {
+    link.href = `carteirinha.html?numeroCruzado=${encodeURIComponent(numeroCruzado)}`;
+    container.style.display = 'block';
+  } else {
+    link.removeAttribute('href');
+    container.style.display = 'none';
+  }
+}
+
 // Normaliza nome para comparação (ignora acentos/caixa/duplos espaços)
 function normalizarNome(nome) {
   return String(nome || '')
@@ -227,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
       editToken = data.token;
       setStatusCodigo('✅ Código validado. Você já pode editar e salvar.');
       habilitarEdicao(true);
+      mostrarLinkCarteirinha(cruzadoOriginal);
       const edicaoForm = document.getElementById('edicaoForm');
       if (edicaoForm) edicaoForm.style.display = 'block';
     } catch (e) {
@@ -276,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
       editToken = data.token;
       if (statusSemEmail) statusSemEmail.textContent = '✅ Identidade validada. Você já pode editar e salvar.';
       habilitarEdicao(true);
+      mostrarLinkCarteirinha(cruzadoOriginal);
       const edicaoForm = document.getElementById('edicaoForm');
       if (edicaoForm) edicaoForm.style.display = 'block';
     } catch (e) {
@@ -656,6 +673,10 @@ function limparFormulario() {
 const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.display = 'none';
   const cd = document.getElementById('consignacaoDocumentoContainer'); if (cd) cd.style.display = 'none';
   const vc = document.getElementById('voluntarioContainer'); if (vc) vc.style.display = 'none';
+  const carteirinhaLinkContainer = document.getElementById('carteirinhaLinkContainer');
+  const carteirinhaLink = document.getElementById('carteirinhaLink');
+  if (carteirinhaLinkContainer) carteirinhaLinkContainer.style.display = 'none';
+  if (carteirinhaLink) carteirinhaLink.removeAttribute('href');
   const certInfo = document.getElementById('certificadoIndicacaoInfo'); if (certInfo) certInfo.textContent = '';
   const volInfo = document.getElementById('documentoVoluntarioInfo'); if (volInfo) volInfo.textContent = '';
   const codigoInput = document.getElementById('codigo');

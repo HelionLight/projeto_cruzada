@@ -108,6 +108,9 @@
     <div id="edicaoForm" style="display: none;">
       <form id="formAtualizacao" enctype="multipart/form-data">
         <h2>Informações Pessoais</h2>
+        <div id="carteirinhaLinkContainer" style="display: none; margin: 0 0 16px; padding: 10px; background-color: #e3f2fd; border-radius: 4px;">
+          <a id="carteirinhaLink" href="#" target="_blank" rel="noopener noreferrer" style="color: #1976d2; font-weight: bold;">Ver carteirinha digital</a>
+        </div>
         <label for="nome">Nome:</label>
         <input type="text" id="nome" name="nome" >
 
@@ -249,7 +252,8 @@
           </div>
 
           <div id="consignacaoOpcaoContainer" style="display: none; margin-top: 10px;">
-            <label for="consignacao">Contribuição consignada em folha?</label>
+            <p style="margin: 8px 0; color: #666;">Você que é militar do Exército, existe também a possibilidade de consignação em folha.</p>
+            <label for="consignacao">Deseja optar pela consignação em folha?</label>
             <select id="consignacao" name="consignacao">
               <option value="false">Não</option>
               <option value="true">Sim</option>

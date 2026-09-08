@@ -485,7 +485,7 @@ router.get('/carteirinha/:numeroCruzado', async (req, res) => {
       return res.status(404).json({ message: 'Carteirinha não encontrada para este número.' });
     }
 
-    const baseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
     const validationUrl = `${baseUrl}/validar.html?numeroCruzado=${encodeURIComponent(cruzado.numeroCruzado)}`;
     const qrCodeDataUrl = await QRCode.toDataURL(validationUrl, { width: 260 });
     const fotoUrl = cruzado.foto ? `/api/cruzados/image/${cruzado.foto}` : null;
