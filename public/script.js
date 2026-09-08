@@ -61,6 +61,16 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.display = 'none';
         document.getElementById('especificarVinculo').value = '';
       }
+
+      if (vinculoSelect.value === 'Exército') {
+        if (consignacaoOpcao) consignacaoOpcao.style.display = 'block';
+      } else {
+        if (consignacaoOpcao) {
+          consignacaoOpcao.style.display = 'none';
+          document.getElementById('consignacao').value = 'false';
+          document.getElementById('consignacaoDocumentoContainer').style.display = 'none';
+        }
+      }
     });
   }
 
