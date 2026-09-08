@@ -72,9 +72,8 @@ const cruzadoSchema = Joi.object({
   cpfResponsavelIndicacao: Joi.string().required(),
   desejaContribuir: Joi.boolean().required(),
   valorContribuicao: Joi.number().optional(),
-  consignacao: Joi.boolean().optional(),
+    consignacao: Joi.boolean().optional(),
   numeroCruzado: Joi.string().optional(),
-  encarnado: Joi.boolean().required(),
   trabalharVoluntario: Joi.boolean().optional()
 });
 
@@ -100,9 +99,8 @@ const cruzadoUpdateSchema = Joi.object({
   cpfResponsavelIndicacao: Joi.string().allow('').optional(),
   desejaContribuir: Joi.boolean().optional(),
   valorContribuicao: Joi.number().optional(),
-  consignacao: Joi.boolean().optional(),
+    consignacao: Joi.boolean().optional(),
   numeroCruzado: Joi.string().allow('').optional(),
-  encarnado: Joi.boolean().optional(),
   trabalharVoluntario: Joi.boolean().optional()
 });
 
@@ -564,9 +562,8 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
       'Celular': cruzado.celular,
       'Idade': calcularIdade(cruzado.dataNascimento),
       'Sexo': cruzado.sexo || '',
-      'Estado': cruzado.estado || '',
+            'Estado': cruzado.estado || '',
       'Número Cruzado': cruzado.numeroCruzado || '',
-      'Encarnado': cruzado.encarnado ? 'Sim' : 'Não',
       'Contribui': cruzado.desejaContribuir ? 'Sim' : 'Não',
       'Valor Contribuição': cruzado.valorContribuicao != null ? cruzado.valorContribuicao : '',
       'Consignado': cruzado.consignacao ? 'Sim' : 'Não',
@@ -587,9 +584,8 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
       { wch: 16 },  // Celular
       { wch: 8 },   // Idade
       { wch: 10 },  // Sexo
-      { wch: 8 },   // Estado
+            { wch: 8 },   // Estado
       { wch: 15 },  // Número Cruzado
-      { wch: 10 },  // Encarnado
       { wch: 14 },  // Deseja Contribuir
       { wch: 18 },  // Valor Contribuição
       { wch: 12 },  // Consignação

@@ -118,8 +118,7 @@ const buildDocument = (row, rowNumber, target) => {
   const valorContribuicao = valorContribuicaoRaw === undefined || valorContribuicaoRaw === null || valorContribuicaoRaw === ''
     ? null
     : Number(String(valorContribuicaoRaw).replace('.', '').replace(',', '.'));
-  const consignacao = parseBoolean(getHeaderValue(row, ['consignacao', 'consignação']), null);
-  const encarnado = parseBoolean(getHeaderValue(row, ['encarnado']), null);
+    const consignacao = parseBoolean(getHeaderValue(row, ['consignacao', 'consignação']), null);
   const trabalharVoluntario = parseBoolean(getHeaderValue(row, ['trabalhar voluntario', 'trabalhar voluntário', 'voluntario', 'voluntário']), false);
   const numeroCruzadoRaw = normalizeText(getHeaderValue(row, ['numero cruzado', 'número cruzado', 'numero', 'número']));
   const numeroCruzado = numeroCruzadoRaw || null;
@@ -147,9 +146,8 @@ const buildDocument = (row, rowNumber, target) => {
     cpfResponsavelIndicacao: cpfResponsavelIndicacao || null,
     desejaContribuir,
     valorContribuicao: Number.isFinite(valorContribuicao) ? valorContribuicao : null,
-    consignacao,
+        consignacao,
     numeroCruzado,
-    encarnado,
     trabalharVoluntario,
     status: target === 'permanent' ? 'aprovado' : 'pendente',
     dataAprovacao: target === 'permanent' ? (dataAprovacao || new Date()) : null,

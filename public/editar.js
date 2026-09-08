@@ -353,16 +353,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Campos condicionais - Vínculo
+    // Campos condicionais - Vínculo
   if (vinculoSelect) {
     vinculoSelect.addEventListener('change', () => {
       const container = document.getElementById('especificarVinculoContainer');
+      const consignacaoOpcao = document.getElementById('consignacaoOpcaoContainer');
+
       if (vinculoSelect.value === 'Outros') {
         container.style.display = 'block';
       } else {
         container.style.display = 'none';
         const esp = document.getElementById('especificarVinculo');
         if (esp) esp.value = '';
+      }
+
+      // Mostrar opção de consignação apenas para Exército
+      if (vinculoSelect.value === 'Exército') {
+        if (consignacaoOpcao) consignacaoOpcao.style.display = 'block';
+      } else {
+        if (consignacaoOpcao) {
+          consignacaoOpcao.style.display = 'none';
+          document.getElementById('consignacao').value = 'false';
+          document.getElementById('consignacaoDocumentoContainer').style.display = 'none';
+        }
       }
     });
   }
@@ -517,8 +530,7 @@ function preencherFormulario(cruzado) {
   document.getElementById('endereco').value = cruzado.endereco || '';
   document.getElementById('cep').value = cruzado.cep || '';
   document.getElementById('sexo').value = cruzado.sexo || '';
-  document.getElementById('dataNascimento').value = cruzado.dataNascimento ? cruzado.dataNascimento.split('T')[0] : '';
-  document.getElementById('encarnado').value = cruzado.encarnado ? 'true' : 'false';
+    document.getElementById('dataNascimento').value = cruzado.dataNascimento ? cruzado.dataNascimento.split('T')[0] : '';
   document.getElementById('vinculoProfissional').value = cruzado.vinculoProfissional || '';
   document.getElementById('especificarVinculo').value = cruzado.especificarVinculo || '';
   document.getElementById('situacaoProfissional').value = cruzado.situacaoProfissional || '';
