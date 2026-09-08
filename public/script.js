@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const vinculoSelect = document.getElementById('vinculoProfissional');
   const situacaoSelect = document.getElementById('situacaoProfissional');
   const desejaContribuirSelect = document.getElementById('desejaContribuir');
+  const consignacaoOpcao = document.getElementById('consignacaoOpcaoContainer');
 
   if (cpfInput) {
     cpfInput.addEventListener('input', (e) => {

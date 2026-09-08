@@ -559,6 +559,10 @@ document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
   if (cruzado.vinculoProfissional === 'Outros') {
     document.getElementById('especificarVinculoContainer').style.display = 'block';
   }
+  if (cruzado.vinculoProfissional === 'Exército') {
+    const consignacaoOpcao = document.getElementById('consignacaoOpcaoContainer');
+    if (consignacaoOpcao) consignacaoOpcao.style.display = 'block';
+  }
   if (cruzado.situacaoProfissional === 'Outros') {
     document.getElementById('especificarSituacaoContainer').style.display = 'block';
   }
