@@ -235,7 +235,11 @@ router.post('/register', upload, async (req, res) => {
       foto: fotoId,
       certificadoIndicacao: certificadoId,
       documentoVoluntario: documentoVoluntarioId,
-      documentoConsignacao: documentoConsignacaoId
+      documentoConsignacao: documentoConsignacaoId,
+
+      // Status dos processos extras, independentes do cadastro principal
+      statusConsignacao: consignacao ? 'pendente' : 'nao_solicitada',
+      statusVoluntariado: trabalharVoluntario ? 'pendente' : 'nao_solicitado'
     };
 
     const cruzado = new CruzadoTemp(cruzadoData);
@@ -284,9 +288,9 @@ router.get('/pending/voluntarios', authenticate, authorize('admin', 'secretario'
       CruzadoTemp.find({
         status: 'aguardando_documentos',
         trabalharVoluntario: true,
+        statusVoluntariado: 'pendente',
         documentoVoluntario: { $exists: true, $ne: null }
       }),
-
       Cruzado.find({
         statusVoluntariado: 'pendente',
         trabalharVoluntario: true,
@@ -338,6 +342,12 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
           });
         }
 
+        if (!cruzado.documentoVoluntario) {
+          return res.status(400).json({
+            message: 'Este cadastro não possui documento de voluntariado.'
+          });
+        }
+
         cruzado.statusVoluntariado = status;
       }
 
@@ -345,6 +355,12 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
         if (!cruzado.consignacao) {
           return res.status(400).json({
             message: 'Este cadastro não solicitou consignação.'
+          });
+        }
+
+        if (!cruzado.documentoConsignacao) {
+          return res.status(400).json({
+            message: 'Este cadastro não possui documento de consignação.'
           });
         }
 
@@ -631,7 +647,6 @@ router.get('/consignacao', authenticate, authorize('admin', 'secretario'), async
     const [temporarios, permanentes] = await Promise.all([
       CruzadoTemp.find({
         status: 'aguardando_documentos',
-        statusVoluntariado: 'pendente',
         consignacao: true,
         statusConsignacao: 'pendente',
         documentoConsignacao: { $exists: true, $ne: null }
