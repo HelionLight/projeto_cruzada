@@ -277,10 +277,24 @@ router.get('/pending', authenticate, authorize('admin', 'secretario'), async (re
 });
 
 // Listar registros pendentes de voluntários (admin)
+
 router.get('/pending/voluntarios', authenticate, authorize('admin', 'secretario'), async (req, res) => {
   try {
-    const voluntarios = await CruzadoTemp.find({ status: 'aguardando_documentos', trabalharVoluntario: true, documentoVoluntario: { $exists: true, $ne: null } });
-    res.json(voluntarios);
+    const [temporarios, permanentes] = await Promise.all([
+      CruzadoTemp.find({
+        status: 'aguardando_documentos',
+        trabalharVoluntario: true,
+        documentoVoluntario: { $exists: true, $ne: null }
+      }),
+
+      Cruzado.find({
+        statusVoluntariado: 'pendente',
+        trabalharVoluntario: true,
+        documentoVoluntario: { $exists: true, $ne: null }
+      })
+    ]);
+
+    res.json([...temporarios, ...permanentes]);
   } catch (err) {
     console.error('Erro ao listar voluntários:', err);
     res.status(500).json({ message: 'Erro interno do servidor' });
@@ -288,26 +302,86 @@ router.get('/pending/voluntarios', authenticate, authorize('admin', 'secretario'
 });
 
 // Aprovar/rejeitar
+
+
 router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async (req, res) => {
-  const { status } = req.body; // 'aprovado' ou 'rejeitado'
-  
+  const { status, processo } = req.body;
+
   if (!status || !['aprovado', 'rejeitado'].includes(status)) {
-    return res.status(400).json({ message: 'Status inválido! Use "aprovado" ou "rejeitado".' });
+    return res.status(400).json({
+      message: 'Status inválido! Use "aprovado" ou "rejeitado".'
+    });
   }
 
   try {
+    // ==========================================
+    // 1. ATUALIZAR VOLUNTARIADO OU CONSIGNAÇÃO
+    // ==========================================
+    if (processo === 'voluntariado' || processo === 'consignacao') {
+      const temp = await CruzadoTemp.findById(req.params.id);
+      const permanente = temp
+        ? null
+        : await Cruzado.findById(req.params.id);
+
+      const cruzado = temp || permanente;
+
+      if (!cruzado) {
+        return res.status(404).json({
+          message: 'Registro não encontrado.'
+        });
+      }
+
+      if (processo === 'voluntariado') {
+        if (!cruzado.trabalharVoluntario) {
+          return res.status(400).json({
+            message: 'Este cadastro não solicitou voluntariado.'
+          });
+        }
+
+        cruzado.statusVoluntariado = status;
+      }
+
+      if (processo === 'consignacao') {
+        if (!cruzado.consignacao) {
+          return res.status(400).json({
+            message: 'Este cadastro não solicitou consignação.'
+          });
+        }
+
+        cruzado.statusConsignacao =
+          status === 'aprovado' ? 'aprovada' : 'rejeitada';
+      }
+
+      cruzado.updatedAt = new Date();
+      await cruzado.save();
+
+      return res.json({
+        message: processo === 'voluntariado'
+          ? `Voluntariado ${status} com sucesso!`
+          : `Consignação ${status === 'aprovado' ? 'aprovada' : 'rejeitada'} com sucesso!`
+      });
+    }
+
+    // ==========================================
+    // 2. APROVAÇÃO/REJEIÇÃO DO CADASTRO PRINCIPAL
+    // ==========================================
     const tempCruzado = await CruzadoTemp.findById(req.params.id);
-    if (!tempCruzado) return res.status(404).json({ message: 'Registro não encontrado!' });
+
+    if (!tempCruzado) {
+      return res.status(404).json({
+        message: 'Registro temporário não encontrado!'
+      });
+    }
 
     if (status === 'aprovado') {
-
-      // Aprovação final: atribuir numeroCruzado (contador atômico) e enviar e-mail 3.1
-      const counter = await CruzadoCounter.findByIdAndUpdate(
+      // Inicializar contador, caso não exista
+      await CruzadoCounter.findByIdAndUpdate(
         'cruzado',
         { $setOnInsert: { nextNumeroCruzado: 7999 } },
         { upsert: true, new: true }
       );
 
+      // Incrementar contador
       const counter2 = await CruzadoCounter.findByIdAndUpdate(
         'cruzado',
         { $inc: { nextNumeroCruzado: 1 } },
@@ -316,171 +390,143 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
 
       const numeroCruzado = String(counter2.nextNumeroCruzado);
 
-      // Mover para coleção permanente
       const permanentCruzado = new Cruzado({
         ...tempCruzado.toObject(),
+
         numeroCruzado,
         status: 'aprovado',
+
+        // Preservar decisões dos processos extras
         statusConsignacao: tempCruzado.consignacao
-          ? 'pendente'
+          ? (tempCruzado.statusConsignacao || 'pendente')
           : 'nao_solicitada',
 
         statusVoluntariado: tempCruzado.trabalharVoluntario
-          ? 'pendente'
+          ? (tempCruzado.statusVoluntariado || 'pendente')
           : 'nao_solicitado',
+
         dataAprovacao: new Date(),
-        updatedAt: Date.now()
+        updatedAt: new Date()
       });
 
       await permanentCruzado.save();
 
-      // Remover da temporária
+      // Remover da coleção temporária
       await CruzadoTemp.findByIdAndDelete(req.params.id);
 
-      // Enviar e-mail do candidato (aprovado)
+      // E-mail de aprovação do cadastro principal
       try {
         const transporter = getEmailTransporter();
+
         if (transporter) {
+          const baseUrl = process.env.APP_BASE_URL ||
+            `http://localhost:${process.env.PORT || 3000}`;
+
+          const carteirinhaUrl =
+            `${baseUrl}/carteirinha.html?numeroCruzado=${numeroCruzado}`;
+
           const assuntoCandidato = 'Cadastro aprovado - Cruzada';
-          const textoCandidato = `Olá, ${tempCruzado.nome}!\n\nSeu cadastro foi APROVADO.\n\nNúmero Cruzado: ${numeroCruzado}\n\nCarteirinha digital: (placeholder)\n\nObrigado!`;
-          const baseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
-      const carteirinhaUrl = `${baseUrl}/carteirinha.html?numeroCruzado=${numeroCruzado}`;
-      const htmlCandidato = `
+
+          const textoCandidato =
+            `Olá, ${tempCruzado.nome}!\n\n` +
+            `Seu cadastro foi APROVADO.\n\n` +
+            `Número Cruzado: ${numeroCruzado}\n\n` +
+            `Carteirinha digital: ${carteirinhaUrl}\n\n` +
+            `Obrigado!`;
+
+          const htmlCandidato = `
             <div style="font-family: Arial, sans-serif;">
               <h3>Cadastro aprovado</h3>
               <p>Olá, <strong>${tempCruzado.nome}</strong>!</p>
               <p>Seu cadastro foi <strong>APROVADO</strong>.</p>
               <p><strong>Número Cruzado:</strong> ${numeroCruzado}</p>
-              <p>Sua carteirinha digital está disponível em: <a href="${carteirinhaUrl}">${carteirinhaUrl}</a></p>
+              <p>Sua carteirinha digital está disponível em:
+                <a href="${carteirinhaUrl}">${carteirinhaUrl}</a>
+              </p>
               <p>Obrigado!</p>
             </div>
           `;
 
-await transporter.sendMail({
+          await transporter.sendMail({
             from: process.env.GMAIL_USER,
             to: tempCruzado.email,
-            subject: assuntoCandidato,
-            text: textoCandidato + '\n\nAcesse: ' + carteirinhaUrl,
-            html: htmlCandidato
-          });
-        }
-      } catch (e) {
-        console.error('Erro ao enviar e-mail do candidato (aprovado):', e);
-      }
-
-      res.json({ message: 'Registro aprovado e movido para banco permanente!' });
-  } else if (status === 'rejeitado') {
-      // Enviar e-mail de recusa 3.2 (precisa do temp antes de deletar)
-      try {
-        const temp = tempCruzado;
-        const transporter = getEmailTransporter();
-        if (transporter) {
-          const assuntoCandidato = 'Cadastro recusado - Cruzada';
-          const textoCandidato = `Olá, ${temp.nome}!\n\nSeu cadastro foi RECUSADO pela administração.\n\nNúmero Cruzado: (não atribuído)\n\nObrigado.`;
-          const htmlCandidato = `
-            <div style="font-family: Arial, sans-serif;">
-              <h3>Cadastro recusado</h3>
-              <p>Olá, <strong>${temp.nome}</strong>!</p>
-              <p>Seu cadastro foi <strong>RECUSADO</strong> pela administração.</p>
-              <p>Número Cruzado: (não atribuído)</p>
-              <p>Obrigado!</p>
-            </div>
-          `;
-
-await transporter.sendMail({
-            from: process.env.GMAIL_USER,
-            to: temp.email,
             subject: assuntoCandidato,
             text: textoCandidato,
             html: htmlCandidato
           });
         }
       } catch (e) {
-        console.error('Erro ao enviar e-mail do candidato (rejeitado):', e);
+        console.error(
+          'Erro ao enviar e-mail do candidato (aprovado):',
+          e
+        );
       }
 
-      // Deletar imediatamente da temporária
-      await CruzadoTemp.findByIdAndDelete(req.params.id);
-      res.json({ message: 'Registro rejeitado e removido com sucesso!' });
-
+      return res.json({
+        message: 'Registro aprovado e movido para banco permanente!'
+      });
     }
+
+    // ==========================================
+    // 3. REJEIÇÃO DO CADASTRO PRINCIPAL
+    // ==========================================
+    if (status === 'rejeitado') {
+      try {
+        const transporter = getEmailTransporter();
+
+        if (transporter) {
+          const assuntoCandidato = 'Cadastro recusado - Cruzada';
+
+          const textoCandidato =
+            `Olá, ${tempCruzado.nome}!\n\n` +
+            `Seu cadastro foi RECUSADO pela administração.\n\n` +
+            `Obrigado.`;
+
+          const htmlCandidato = `
+            <div style="font-family: Arial, sans-serif;">
+              <h3>Cadastro recusado</h3>
+              <p>Olá, <strong>${tempCruzado.nome}</strong>!</p>
+              <p>Seu cadastro foi <strong>RECUSADO</strong> pela administração.</p>
+              <p>Obrigado.</p>
+            </div>
+          `;
+
+          await transporter.sendMail({
+            from: process.env.GMAIL_USER,
+            to: tempCruzado.email,
+            subject: assuntoCandidato,
+            text: textoCandidato,
+            html: htmlCandidato
+          });
+        }
+      } catch (e) {
+        console.error(
+          'Erro ao enviar e-mail do candidato (rejeitado):',
+          e
+        );
+      }
+
+      await CruzadoTemp.findByIdAndDelete(req.params.id);
+
+      return res.json({
+        message: 'Registro rejeitado e removido com sucesso!'
+      });
+    }
+
   } catch (err) {
     console.error('Erro ao atualizar status:', err);
+
     if (err.code === 11000) {
-      return res.status(400).json({ message: 'Não foi possível aprovar: CPF ou Email já existe no banco permanente!' });
+      return res.status(400).json({
+        message: 'Não foi possível aprovar: CPF ou Email já existe no banco permanente!'
+      });
     }
-    res.status(500).json({ message: 'Erro ao atualizar status. Tente novamente.' });
+
+    return res.status(500).json({
+      message: 'Erro ao atualizar status. Tente novamente.'
+    });
   }
 });
-
-// Atualizar status de consignação ou voluntariado
-router.put(
-  '/:numeroCruzado/processo',
-  authenticate,
-  authorize('admin', 'secretario'),
-  async (req, res) => {
-    try {
-      const { numeroCruzado } = req.params;
-      const { processo, status } = req.body;
-
-      const camposPermitidos = {
-        consignacao: [
-          'pendente',
-          'aprovada',
-          'rejeitada'
-        ],
-        voluntariado: [
-          'pendente',
-          'aprovado',
-          'rejeitado'
-        ]
-      };
-
-      if (!camposPermitidos[processo]) {
-        return res.status(400).json({
-          message: 'Processo inválido.'
-        });
-      }
-
-      if (!camposPermitidos[processo].includes(status)) {
-        return res.status(400).json({
-          message: 'Status inválido para este processo.'
-        });
-      }
-
-      const campoStatus = processo === 'consignacao'
-        ? 'statusConsignacao'
-        : 'statusVoluntariado';
-
-      const cruzado = await Cruzado.findOneAndUpdate(
-        { numeroCruzado },
-        { $set: { [campoStatus]: status } },
-        { new: true, runValidators: true }
-      );
-
-      if (!cruzado) {
-        return res.status(404).json({
-          message: 'Cadastro permanente não encontrado.'
-        });
-      }
-
-      res.json({
-        message: 'Status do processo atualizado.',
-        numeroCruzado: cruzado.numeroCruzado,
-        statusCadastro: cruzado.status,
-        statusConsignacao: cruzado.statusConsignacao,
-        statusVoluntariado: cruzado.statusVoluntariado
-      });
-    } catch (err) {
-      console.error('Erro ao atualizar processo:', err);
-
-      res.status(500).json({
-        message: 'Erro ao atualizar processo.'
-      });
-    }
-  }
-);
-
 // Atualizar registro (se numeroCruzado fornecido)
 router.put('/:numeroCruzado', authenticate, authorize('admin'), async (req, res) => {
   try {
@@ -579,15 +625,30 @@ router.get('/carteirinha/:numeroCruzado', async (req, res) => {
 });
 
 // Listar registros com documento de consignação em folha
+
 router.get('/consignacao', authenticate, authorize('admin', 'secretario'), async (req, res) => {
   try {
-    const registros = await CruzadoTemp.find({
-      status: 'aguardando_documentos',
-      consignacao: true,
-      documentoConsignacao: { $exists: true, $ne: null }
-    }).sort({ createdAt: -1 }).select('nome email cpf numeroCruzado documentoConsignacao _id');
+    const [temporarios, permanentes] = await Promise.all([
+      CruzadoTemp.find({
+        status: 'aguardando_documentos',
+        statusVoluntariado: 'pendente',
+        consignacao: true,
+        statusConsignacao: 'pendente',
+        documentoConsignacao: { $exists: true, $ne: null }
+      })
+        .sort({ createdAt: -1 })
+        .select('nome email cpf numeroCruzado documentoConsignacao _id'),
 
-    res.json(registros);
+      Cruzado.find({
+        statusConsignacao: 'pendente',
+        consignacao: true,
+        documentoConsignacao: { $exists: true, $ne: null }
+      })
+        .sort({ createdAt: -1 })
+        .select('nome email cpf numeroCruzado documentoConsignacao _id')
+    ]);
+
+    res.json([...temporarios, ...permanentes]);
   } catch (err) {
     console.error('Erro ao listar consignação:', err);
     res.status(500).json({ message: 'Erro interno do servidor' });

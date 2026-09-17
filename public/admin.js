@@ -227,6 +227,7 @@ async function importarPlanilhaExcel() {
 }
 
 // Carregar voluntários pendentes
+
 async function loadPendingVoluntarios() {
   try {
     const response = await fetch('/api/cruzados/pending/voluntarios', {
@@ -248,27 +249,37 @@ async function loadPendingVoluntarios() {
 
     voluntarios.forEach(voluntario => {
       const row = document.createElement('tr');
-      
+
       // Construir URL da foto
-      const fotoUrl = voluntario.foto ? `/api/cruzados/image/${voluntario.foto}` : null;
+      const fotoUrl = voluntario.foto
+        ? `/api/cruzados/image/${voluntario.foto}`
+        : null;
+
       // URL do documento de voluntário (termo assinado)
-      const documentoUrl = voluntario.documentoVoluntario ? `/api/cruzados/image/${voluntario.documentoVoluntario}` : null;
-      
+      const documentoUrl = voluntario.documentoVoluntario
+        ? `/api/cruzados/image/${voluntario.documentoVoluntario}`
+        : null;
+
       row.innerHTML = `
         <td>${voluntario.nome}</td>
         <td>${voluntario.email}</td>
         <td>${voluntario.numeroCruzado || '-'}</td>
         <td>
-          ${fotoUrl ? `<a href="${fotoUrl}" target="_blank"><button class="btnView">Ver Foto</button></a>` : 'Sem foto'}
+          ${fotoUrl
+            ? `<a href="${fotoUrl}" target="_blank"><button class="btnView">Ver Foto</button></a>`
+            : 'Sem foto'}
         </td>
         <td>
-          ${documentoUrl ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Ver Termo</button></a>` : 'Sem termo'}
+          ${documentoUrl
+            ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Ver Termo</button></a>`
+            : 'Sem termo'}
         </td>
         <td>
           <button class="btnApprove" onclick="approveVoluntario('${voluntario._id}')">Aprovar</button>
           <button class="btnReject" onclick="rejectVoluntario('${voluntario._id}')">Rejeitar</button>
         </td>
       `;
+
       tbody.appendChild(row);
     });
   } catch (error) {
@@ -299,26 +310,32 @@ async function loadPendingConsignacao() {
     tbody.innerHTML = '';
 
     if (registros.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">✅ Nenhum documento de consignação pendente.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">✅ Nenhum documento de consignação pendente.</td></tr>';
       return;
     }
 
     registros.forEach(registro => {
       const row = document.createElement('tr');
-      const documentoUrl = registro.documentoConsignacao ? `/api/cruzados/image/${registro.documentoConsignacao}` : null;
+
+      const documentoUrl = registro.documentoConsignacao
+        ? `/api/cruzados/image/${registro.documentoConsignacao}`
+        : null;
 
       row.innerHTML = `
         <td>${registro.nome}</td>
         <td>${registro.email}</td>
         <td>${registro.numeroCruzado || '-'}</td>
         <td>
-          ${documentoUrl ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Baixar PDF</button></a>` : 'Sem PDF'}
+          ${documentoUrl
+            ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Baixar PDF</button></a>`
+            : 'Sem PDF'}
         </td>
         <td>
           <button class="btnApprove" onclick="approveConsignacao('${registro._id}')">Aprovar</button>
           <button class="btnReject" onclick="rejectConsignacao('${registro._id}')">Rejeitar</button>
         </td>
       `;
+
       tbody.appendChild(row);
     });
   } catch (error) {
@@ -334,14 +351,15 @@ async function updateStatusVoluntario(id, status) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({
+        processo: 'voluntariado',
+        status
+      })
     });
 
     if (response.ok) {
-      const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
-      alert(`✅ Voluntário ${statusText} com sucesso!`);
-      loadPendingVoluntarios();
-      loadPendingConsignacao();
+      alert(`✅ Voluntariado ${status} com sucesso!`);
+      await loadPendingVoluntarios();
     } else {
       const error = await response.json();
       alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));
@@ -367,13 +385,15 @@ async function updateStatusConsignacao(id, status) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({
+        processo: 'consignacao',
+        status
+      })
     });
 
     if (response.ok) {
-      const statusText = status === 'aprovado' ? 'aprovado' : 'rejeitado';
-      alert(`✅ Consignação ${statusText} com sucesso!`);
-      loadPendingConsignacao();
+      alert(`✅ Consignação ${status} com sucesso!`);
+      await loadPendingConsignacao();
     } else {
       const error = await response.json();
       alert('❌ Erro ao atualizar: ' + (error.message || 'Tente novamente.'));
@@ -382,4 +402,3 @@ async function updateStatusConsignacao(id, status) {
     alert('❌ Erro de conexão: ' + error.message);
   }
 }
-

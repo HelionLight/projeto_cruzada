@@ -41,6 +41,16 @@ const cruzadoTempSchema = new mongoose.Schema({
   trabalharVoluntario: { type: Boolean, default: false },
   documentoVoluntario: { type: mongoose.Schema.Types.ObjectId }, // ID do arquivo no GridFS
   status: { type: String, enum: ['pendente', 'aguardando_documentos', 'aprovado', 'rejeitado'], default: 'pendente' },
+  statusConsignacao: {
+    type: String,
+    enum: ['nao_solicitada', 'pendente', 'aprovada', 'rejeitada'],
+    default: 'nao_solicitada'
+  },
+  statusVoluntariado: {
+    type: String,
+    enum: ['nao_solicitado', 'pendente', 'aprovado', 'rejeitado'],
+    default: 'nao_solicitado'
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   expiresAt: { type: Date, default: () => new Date(Date.now() + 180 * 24 * 60 * 60 * 1000), expires: 180 * 24 * 60 * 60 } // 180 dias em segundos
