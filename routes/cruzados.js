@@ -300,12 +300,6 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
     if (!tempCruzado) return res.status(404).json({ message: 'Registro não encontrado!' });
 
     if (status === 'aprovado') {
-      const precisaRevisaoDocumental = Boolean(tempCruzado.trabalharVoluntario || tempCruzado.documentoConsignacao || tempCruzado.documentoVoluntario);
-
-      if (precisaRevisaoDocumental) {
-        await CruzadoTemp.findByIdAndUpdate(req.params.id, { status: 'aguardando_documentos', updatedAt: Date.now() });
-        return res.json({ message: 'Registro aprovado para revisão documental.' });
-      }
 
       // Aprovação final: atribuir numeroCruzado (contador atômico) e enviar e-mail 3.1
       const counter = await CruzadoCounter.findByIdAndUpdate(
@@ -327,6 +321,13 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
         ...tempCruzado.toObject(),
         numeroCruzado,
         status: 'aprovado',
+        statusConsignacao: tempCruzado.consignacao
+          ? 'pendente'
+          : 'nao_solicitada',
+
+        statusVoluntariado: tempCruzado.trabalharVoluntario
+          ? 'pendente'
+          : 'nao_solicitado',
         dataAprovacao: new Date(),
         updatedAt: Date.now()
       });
@@ -411,6 +412,74 @@ await transporter.sendMail({
     res.status(500).json({ message: 'Erro ao atualizar status. Tente novamente.' });
   }
 });
+
+// Atualizar status de consignação ou voluntariado
+router.put(
+  '/:numeroCruzado/processo',
+  authenticate,
+  authorize('admin', 'secretario'),
+  async (req, res) => {
+    try {
+      const { numeroCruzado } = req.params;
+      const { processo, status } = req.body;
+
+      const camposPermitidos = {
+        consignacao: [
+          'pendente',
+          'aprovada',
+          'rejeitada'
+        ],
+        voluntariado: [
+          'pendente',
+          'aprovado',
+          'rejeitado'
+        ]
+      };
+
+      if (!camposPermitidos[processo]) {
+        return res.status(400).json({
+          message: 'Processo inválido.'
+        });
+      }
+
+      if (!camposPermitidos[processo].includes(status)) {
+        return res.status(400).json({
+          message: 'Status inválido para este processo.'
+        });
+      }
+
+      const campoStatus = processo === 'consignacao'
+        ? 'statusConsignacao'
+        : 'statusVoluntariado';
+
+      const cruzado = await Cruzado.findOneAndUpdate(
+        { numeroCruzado },
+        { $set: { [campoStatus]: status } },
+        { new: true, runValidators: true }
+      );
+
+      if (!cruzado) {
+        return res.status(404).json({
+          message: 'Cadastro permanente não encontrado.'
+        });
+      }
+
+      res.json({
+        message: 'Status do processo atualizado.',
+        numeroCruzado: cruzado.numeroCruzado,
+        statusCadastro: cruzado.status,
+        statusConsignacao: cruzado.statusConsignacao,
+        statusVoluntariado: cruzado.statusVoluntariado
+      });
+    } catch (err) {
+      console.error('Erro ao atualizar processo:', err);
+
+      res.status(500).json({
+        message: 'Erro ao atualizar processo.'
+      });
+    }
+  }
+);
 
 // Atualizar registro (se numeroCruzado fornecido)
 router.put('/:numeroCruzado', authenticate, authorize('admin'), async (req, res) => {
