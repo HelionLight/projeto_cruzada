@@ -73,6 +73,8 @@ async function loadPending() {
     }
 
     const pendentes = await response.json();
+    const pendingCount = document.getElementById('pendingCount');
+    if (pendingCount) pendingCount.textContent = pendentes.length;
     const tbody = document.getElementById('pendingTableBody');
     tbody.innerHTML = '';
 
@@ -239,6 +241,8 @@ async function loadPendingVoluntarios() {
     }
 
     const voluntarios = await response.json();
+    const pendingVoluntariosCount = document.getElementById('pendingVoluntariosCount');
+    if (pendingVoluntariosCount) pendingVoluntariosCount.textContent = voluntarios.length;
     const tbody = document.getElementById('pendingVoluntariosTableBody');
     tbody.innerHTML = '';
 
@@ -306,6 +310,8 @@ async function loadPendingConsignacao() {
     }
 
     const registros = await response.json();
+    const pendingConsignacaoCount = document.getElementById('pendingConsignacaoCount');
+    if (pendingConsignacaoCount) pendingConsignacaoCount.textContent = registros.length;
     const tbody = document.getElementById('pendingConsignacaoTableBody');
     tbody.innerHTML = '';
 

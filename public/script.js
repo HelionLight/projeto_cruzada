@@ -33,6 +33,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const situacaoSelect = document.getElementById('situacaoProfissional');
   const desejaContribuirSelect = document.getElementById('desejaContribuir');
   const consignacaoOpcao = document.getElementById('consignacaoOpcaoContainer');
+  const fotoInput = document.getElementById('foto');
+  const fotoPreview = document.getElementById('fotoPreview');
+  let fotoPreviewUrl = null;
+
+  const limparFotoPreview = () => {
+    if (fotoPreviewUrl) {
+      URL.revokeObjectURL(fotoPreviewUrl);
+      fotoPreviewUrl = null;
+    }
+    if (fotoPreview) {
+      fotoPreview.removeAttribute('src');
+      fotoPreview.style.display = 'none';
+    }
+  };
+
+  if (fotoInput) {
+    fotoInput.addEventListener('change', () => {
+      const arquivo = fotoInput.files && fotoInput.files[0];
+      limparFotoPreview();
+
+      if (!arquivo || !arquivo.type.startsWith('image/')) return;
+
+      fotoPreviewUrl = URL.createObjectURL(arquivo);
+      if (fotoPreview) {
+        fotoPreview.src = fotoPreviewUrl;
+        fotoPreview.style.display = 'block';
+      }
+    });
+  }
 
   if (cpfInput) {
     cpfInput.addEventListener('input', (e) => {
@@ -138,6 +167,12 @@ document.getElementById('registroForm').addEventListener('submit', async (e) => 
   const cpf = document.getElementById('cpf').value;
   const celular = document.getElementById('celular').value;
   const cep = document.getElementById('cep').value;
+  const consentimento = document.getElementById('consentimento');
+
+  if (!consentimento || !consentimento.checked) {
+    alert('❌ É necessário ler e concordar com o tratamento dos dados pessoais.');
+    return;
+  }
 
   // Validar nome
   if (!nome || nome.trim().length < 3) {
@@ -185,6 +220,11 @@ document.getElementById('registroForm').addEventListener('submit', async (e) => 
     if (response.ok) {
       alert('✅ Registro enviado com sucesso! Aguarde aprovação por email.');
       e.target.reset();
+      const fotoPreview = document.getElementById('fotoPreview');
+      if (fotoPreview) {
+        fotoPreview.removeAttribute('src');
+        fotoPreview.style.display = 'none';
+      }
     } else {
       // Mensagens de erro mais específicas
       const mensagem = result.message;

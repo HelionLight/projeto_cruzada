@@ -46,6 +46,20 @@ function mostrarLinkCarteirinha(cruzado) {
   }
 }
 
+function mostrarNumeroCruzado(cruzado) {
+  const container = document.getElementById('numeroCruzadoContainer');
+  const input = document.getElementById('numeroCruzadoAtual');
+  if (!container || !input) return;
+
+  if (cruzado?.numeroCruzado) {
+    input.value = cruzado.numeroCruzado;
+    container.style.display = 'block';
+  } else {
+    input.value = '';
+    container.style.display = 'none';
+  }
+}
+
 // Normaliza nome para comparação (ignora acentos/caixa/duplos espaços)
 function normalizarNome(nome) {
   return String(nome || '')
@@ -538,6 +552,7 @@ async function executarBusca(url) {
 }
 
 function preencherFormulario(cruzado) {
+  mostrarNumeroCruzado(cruzado);
   document.getElementById('nome').value = cruzado.nome || '';
   document.getElementById('cpf').value = formatarCPF(cruzado.cpf) || '';
   document.getElementById('celular').value = cruzado.celular ? formatarCelular(cruzado.celular) : '';
@@ -563,13 +578,31 @@ document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
 
   // Mostrar informações de arquivos existentes
   if (cruzado.foto) {
-    document.getElementById('fotoInfo').textContent = '📷 Foto já existente (deixe em branco para não alterar)';
+    const fotoAtual = document.getElementById('fotoAtual');
+    if (fotoAtual) {
+      fotoAtual.src = `/api/cruzados/image/${cruzado.foto}`;
+      fotoAtual.alt = `Foto de ${cruzado.nome || 'Cruzado'}`;
+      fotoAtual.style.display = 'block';
+    }
+    document.getElementById('fotoInfo').textContent = '📷 Foto atual (deixe o campo em branco para não alterar)';
   }
   if (cruzado.certificadoIndicacao) {
     document.getElementById('certificadoIndicacaoInfo').textContent = '📄 Certificado já existente (deixe em branco para não alterar)';
   }
   if (cruzado.documentoVoluntario) {
     document.getElementById('documentoVoluntarioInfo').textContent = '📄 Termo já existente (deixe em branco para não alterar)';
+    const documentoVoluntarioAtual = document.getElementById('documentoVoluntarioAtual');
+    if (documentoVoluntarioAtual) {
+      documentoVoluntarioAtual.href = `/api/cruzados/image/${cruzado.documentoVoluntario}`;
+      documentoVoluntarioAtual.style.display = 'inline-block';
+    }
+  }
+  if (cruzado.documentoConsignacao) {
+    const documentoConsignacaoAtual = document.getElementById('documentoConsignacaoAtual');
+    if (documentoConsignacaoAtual) {
+      documentoConsignacaoAtual.href = `/api/cruzados/image/${cruzado.documentoConsignacao}`;
+      documentoConsignacaoAtual.style.display = 'inline-block';
+    }
   }
 
   // Ativar campos condicionais
@@ -668,6 +701,11 @@ function limparFormulario() {
   const form = document.getElementById('formAtualizacao');
   if (form) form.reset();
   const fotoInfo = document.getElementById('fotoInfo'); if (fotoInfo) fotoInfo.textContent = '';
+  const fotoAtual = document.getElementById('fotoAtual');
+  if (fotoAtual) {
+    fotoAtual.removeAttribute('src');
+    fotoAtual.style.display = 'none';
+  }
   const ev = document.getElementById('especificarVinculoContainer'); if (ev) ev.style.display = 'none';
   const es = document.getElementById('especificarSituacaoContainer'); if (es) es.style.display = 'none';
 const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.display = 'none';
@@ -675,10 +713,24 @@ const cc = document.getElementById('contribuicaoContainer'); if (cc) cc.style.di
   const vc = document.getElementById('voluntarioContainer'); if (vc) vc.style.display = 'none';
   const carteirinhaLinkContainer = document.getElementById('carteirinhaLinkContainer');
   const carteirinhaLink = document.getElementById('carteirinhaLink');
+  const numeroCruzadoContainer = document.getElementById('numeroCruzadoContainer');
+  const numeroCruzadoAtual = document.getElementById('numeroCruzadoAtual');
   if (carteirinhaLinkContainer) carteirinhaLinkContainer.style.display = 'none';
   if (carteirinhaLink) carteirinhaLink.removeAttribute('href');
+  if (numeroCruzadoContainer) numeroCruzadoContainer.style.display = 'none';
+  if (numeroCruzadoAtual) numeroCruzadoAtual.value = '';
   const certInfo = document.getElementById('certificadoIndicacaoInfo'); if (certInfo) certInfo.textContent = '';
   const volInfo = document.getElementById('documentoVoluntarioInfo'); if (volInfo) volInfo.textContent = '';
+  const documentoVoluntarioAtual = document.getElementById('documentoVoluntarioAtual');
+  if (documentoVoluntarioAtual) {
+    documentoVoluntarioAtual.removeAttribute('href');
+    documentoVoluntarioAtual.style.display = 'none';
+  }
+  const documentoConsignacaoAtual = document.getElementById('documentoConsignacaoAtual');
+  if (documentoConsignacaoAtual) {
+    documentoConsignacaoAtual.removeAttribute('href');
+    documentoConsignacaoAtual.style.display = 'none';
+  }
   const codigoInput = document.getElementById('codigo');
   const statusCodigo = document.getElementById('statusCodigo');
   if (codigoInput) codigoInput.value = '';

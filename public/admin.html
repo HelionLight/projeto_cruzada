@@ -16,7 +16,7 @@
       <button id="loginBtn">Entrar</button>
     </div>
     <div id="adminPanel" style="display: none;">
-      <h2>Registros Pendentes - Cruzados</h2>
+      <h2>Registros Pendentes - Cruzados (<span id="pendingCount">0</span>)</h2>
       <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;">
         <button id="exportBtn" class="btnExport">📥 Exportar para Excel</button>
         <button id="importBtn" class="btnExport">📤 Importar planilha Excel</button>
@@ -38,7 +38,7 @@
         </table>
       </div>
 
-      <h2 style="margin-top: 40px;">Registros Pendentes - Voluntários</h2>
+      <h2 style="margin-top: 40px;">Registros Pendentes - Voluntários (<span id="pendingVoluntariosCount">0</span>)</h2>
       <div id="pendingVoluntariosList">
         <table class="pendingTable">
           <thead>
@@ -56,7 +56,7 @@
         </table>
       </div>
 
-      <h2 style="margin-top: 40px;">Documentos de Consignação em Folha</h2>
+      <h2 style="margin-top: 40px;">Documentos de Consignação em Folha (<span id="pendingConsignacaoCount">0</span>)</h2>
       <div id="pendingConsignacaoList">
         <table class="pendingTable">
           <thead>

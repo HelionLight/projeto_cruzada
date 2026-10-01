@@ -74,7 +74,8 @@ const cruzadoSchema = Joi.object({
   valorContribuicao: Joi.number().optional(),
     consignacao: Joi.boolean().optional(),
   numeroCruzado: Joi.string().optional(),
-  trabalharVoluntario: Joi.boolean().optional()
+  trabalharVoluntario: Joi.boolean().optional(),
+  consentimento: Joi.boolean().valid(true).required()
 });
 
 // Schema de atualização flexível (aceita registros legados sem CPF/email)
@@ -244,7 +245,8 @@ router.post('/register', upload, async (req, res) => {
 
     const cruzado = new CruzadoTemp(cruzadoData);
     await cruzado.save();
-    await enviarAlertaSecretario();
+    const pendentes = await CruzadoTemp.countDocuments({ status: 'pendente' });
+    await enviarAlertaSecretario(pendentes);
     res.status(201).json({ message: 'Registro enviado para aprovação' });
   } catch (err) {
     console.error('Erro ao registrar:', err);
@@ -371,6 +373,37 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
       cruzado.updatedAt = new Date();
       await cruzado.save();
 
+      if (status === 'aprovado' && cruzado.email) {
+        const processoNome = processo === 'voluntariado'
+          ? 'Termo de Trabalho Voluntário'
+          : 'Consignação em Folha';
+        const assunto = processo === 'voluntariado'
+          ? 'Termo de voluntariado aprovado - Cruzada'
+          : 'Consignação em folha aprovada - Cruzada';
+        const texto = processo === 'voluntariado'
+          ? `Olá, ${cruzado.nome}!\n\nSeu Termo de Trabalho Voluntário foi APROVADO pela Cruzada.\n\nObrigado!`
+          : `Olá, ${cruzado.nome}!\n\nSeu pedido de Consignação em Folha foi APROVADO pela Cruzada.\n\nObrigado!`;
+        const html = `
+          <div style="font-family: Arial, sans-serif;">
+            <h3>${processoNome} aprovado</h3>
+            <p>Olá, <strong>${cruzado.nome}</strong>!</p>
+            <p>Seu <strong>${processoNome}</strong> foi <strong>APROVADO</strong> pela Cruzada.</p>
+            <p>Obrigado!</p>
+          </div>
+        `;
+
+        try {
+          await sendEmail({
+            to: cruzado.email,
+            subject: assunto,
+            text: texto,
+            html
+          });
+        } catch (emailError) {
+          console.error(`Erro ao enviar aprovação de ${processo}:`, emailError);
+        }
+      }
+
       return res.json({
         message: processo === 'voluntariado'
           ? `Voluntariado ${status} com sucesso!`
@@ -430,11 +463,9 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
       // Remover da coleção temporária
       await CruzadoTemp.findByIdAndDelete(req.params.id);
 
-      // E-mail de aprovação do cadastro principal
+      // E-mails de aprovação do cadastro principal
       try {
-        const transporter = getEmailTransporter();
-
-        if (transporter) {
+        if (tempCruzado.email) {
           const baseUrl = process.env.APP_BASE_URL ||
             `http://localhost:${process.env.PORT || 3000}`;
 
@@ -463,19 +494,43 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
             </div>
           `;
 
-          await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+          await sendEmail({
             to: tempCruzado.email,
             subject: assuntoCandidato,
             text: textoCandidato,
             html: htmlCandidato
           });
         }
+
       } catch (e) {
-        console.error(
-          'Erro ao enviar e-mail do candidato (aprovado):',
-          e
-        );
+        console.error('Erro ao enviar e-mail do candidato (aprovado):', e);
+      }
+
+      try {
+        if (process.env.SECRETARIO_EMAIL) {
+          const assuntoSecretario = 'Cadastro aprovado - Cruzada';
+          const textoSecretario =
+            `O cadastro de ${tempCruzado.nome} foi aprovado.\n\n` +
+            `Número Cruzado: ${numeroCruzado}\n` +
+            `E-mail: ${tempCruzado.email || 'não informado'}\n`;
+          const htmlSecretario = `
+            <div style="font-family: Arial, sans-serif;">
+              <h3>Cadastro aprovado</h3>
+              <p>O cadastro de <strong>${tempCruzado.nome}</strong> foi aprovado.</p>
+              <p><strong>Número Cruzado:</strong> ${numeroCruzado}</p>
+              <p><strong>E-mail:</strong> ${tempCruzado.email || 'não informado'}</p>
+            </div>
+          `;
+
+          await sendEmail({
+            to: process.env.SECRETARIO_EMAIL,
+            subject: assuntoSecretario,
+            text: textoSecretario,
+            html: htmlSecretario
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao enviar e-mail ao secretário (aprovado):', e);
       }
 
       return res.json({
@@ -680,10 +735,34 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
       return res.status(400).json({ message: 'Nenhum registro aprovado para exportar!' });
     }
 
-    // Calcular idade a partir da data de nascimento
+    const SEM_DADOS = 'Sem dados';
+
+    const formatarTexto = (valor) => {
+      if (valor === null || valor === undefined || String(valor).trim() === '') {
+        return SEM_DADOS;
+      }
+      return String(valor);
+    };
+
+    const formatarBooleano = (valor) => {
+      if (valor === null || valor === undefined) return SEM_DADOS;
+      return valor ? 'Sim' : 'Não';
+    };
+
+    const formatarData = (valor) => {
+      if (!valor) return SEM_DADOS;
+      const data = new Date(valor);
+      return Number.isNaN(data.getTime())
+        ? SEM_DADOS
+        : data.toLocaleDateString('pt-BR');
+    };
+
     const calcularIdade = (dataNascimento) => {
-      const hoje = new Date();
+      if (!dataNascimento) return SEM_DADOS;
       const nascimento = new Date(dataNascimento);
+      if (Number.isNaN(nascimento.getTime())) return SEM_DADOS;
+
+      const hoje = new Date();
       let idade = hoje.getFullYear() - nascimento.getFullYear();
       const mes = hoje.getMonth() - nascimento.getMonth();
       if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
@@ -692,52 +771,58 @@ router.get('/export/excel', authenticate, authorize('admin', 'secretario'), asyn
       return idade;
     };
 
-    // Formatar CPF
     const formatarCPF = (cpf) => {
-      const cpfLimpo = cpf.replace(/\D/g, '');
+      const cpfLimpo = cpf ? String(cpf).replace(/\D/g, '') : '';
+      if (!cpfLimpo) return SEM_DADOS;
       return cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     };
 
-    // Preparar dados para exportação (removido 'Status' e adicionadas colunas solicitadas)
+    // Exporta somente dados cadastrais. Fotos e PDFs ficam fora da planilha.
     const dadosExportacao = cruzados.map((cruzado, index) => ({
-      '#': index + 1,
-      'Nome': cruzado.nome,
+      'Nº': index + 1,
+      'Nome': formatarTexto(cruzado.nome),
       'CPF': formatarCPF(cruzado.cpf),
-      'Email': cruzado.email,
-      'Celular': cruzado.celular,
+      'Celular': formatarTexto(cruzado.celular),
+      'E-mail': formatarTexto(cruzado.email),
+      'Estado': formatarTexto(cruzado.estado),
+      'Cidade': formatarTexto(cruzado.cidade),
+      'Endereço': formatarTexto(cruzado.endereco),
+      'CEP': formatarTexto(cruzado.cep),
+      'Sexo': formatarTexto(cruzado.sexo),
+      'Data de nascimento': formatarData(cruzado.dataNascimento),
       'Idade': calcularIdade(cruzado.dataNascimento),
-      'Sexo': cruzado.sexo || '',
-            'Estado': cruzado.estado || '',
-      'Número Cruzado': cruzado.numeroCruzado || '',
-      'Contribui': cruzado.desejaContribuir ? 'Sim' : 'Não',
-      'Valor Contribuição': cruzado.valorContribuicao != null ? cruzado.valorContribuicao : '',
-      'Consignado': cruzado.consignacao ? 'Sim' : 'Não',
-      'Vínculo Profissional': cruzado.vinculoProfissional || '',
-      'Núcleo/GEDE': cruzado.nucleoOuGede || ''
+      'Vínculo profissional': formatarTexto(cruzado.vinculoProfissional),
+      'Especificação do vínculo': formatarTexto(cruzado.especificarVinculo),
+      'Situação profissional': formatarTexto(cruzado.situacaoProfissional),
+      'Especificação da situação': formatarTexto(cruzado.especificarSituacao),
+      'Formação': formatarTexto(cruzado.formacao),
+      'Núcleo/GEDE': formatarTexto(cruzado.nucleoOuGede),
+      'Nome do responsável pela indicação': formatarTexto(cruzado.nomeResponsavelIndicacao),
+      'CPF do responsável pela indicação': formatarCPF(cruzado.cpfResponsavelIndicacao),
+      'Deseja contribuir': formatarBooleano(cruzado.desejaContribuir),
+      'Valor da contribuição': cruzado.valorContribuicao === null || cruzado.valorContribuicao === undefined
+        ? SEM_DADOS
+        : cruzado.valorContribuicao,
+      'Consignação em folha': formatarBooleano(cruzado.consignacao),
+      'Número Cruzado': formatarTexto(cruzado.numeroCruzado),
+      'Encarnado': formatarBooleano(cruzado.encarnado),
+      'Trabalha como voluntário': formatarBooleano(cruzado.trabalharVoluntario),
+      'Status do cadastro': formatarTexto(cruzado.status),
+      'Status da consignação': formatarTexto(cruzado.statusConsignacao),
+      'Status do voluntariado': formatarTexto(cruzado.statusVoluntariado),
+      'Data de aprovação': formatarData(cruzado.dataAprovacao),
+      'Origem do cadastro': formatarTexto(cruzado.origem),
+      'Data de criação': formatarData(cruzado.createdAt),
+      'Data de atualização': formatarData(cruzado.updatedAt)
     }));
 
     // Criar workbook
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.json_to_sheet(dadosExportacao);
 
-    // Definir largura das colunas (ajustado para novas colunas)
-    const colWidths = [
-      { wch: 5 },   // #
-      { wch: 30 },  // Nome
-      { wch: 15 },  // CPF
-      { wch: 30 },  // Email
-      { wch: 16 },  // Celular
-      { wch: 8 },   // Idade
-      { wch: 10 },  // Sexo
-            { wch: 8 },   // Estado
-      { wch: 15 },  // Número Cruzado
-      { wch: 14 },  // Deseja Contribuir
-      { wch: 18 },  // Valor Contribuição
-      { wch: 12 },  // Consignação
-      { wch: 25 },  // Vínculo Profissional
-      { wch: 20 }   // Núcleo/GEDE
-    ];
-    worksheet['!cols'] = colWidths;
+    worksheet['!cols'] = Object.keys(dadosExportacao[0]).map((header) => ({
+      wch: Math.min(Math.max(header.length + 4, 14), 42)
+    }));
 
     // Estilizar cabeçalho
     const range = XLSX.utils.decode_range(worksheet['!ref']);
@@ -908,6 +993,28 @@ router.put('/atualizar/:id', upload, verifyEditToken, async (req, res) => {
     let novaFotoId = cruzadoExistente.foto;
     let novocertificadoId = cruzadoExistente.certificadoIndicacao;
     let novoDocumentoConsignacaoId = cruzadoExistente.documentoConsignacao;
+    let novoDocumentoVoluntarioId = cruzadoExistente.documentoVoluntario;
+
+    const consignacaoSolicitada = req.body.consignacao === true;
+    const voluntariadoSolicitado = req.body.trabalharVoluntario === true;
+    const temNovoDocumentoConsignacao = Boolean(
+      req.files && req.files.documentoConsignacao && req.files.documentoConsignacao[0]
+    );
+    const temNovoDocumentoVoluntario = Boolean(
+      req.files && req.files.documentoVoluntario && req.files.documentoVoluntario[0]
+    );
+
+    if (consignacaoSolicitada && !cruzadoExistente.documentoConsignacao && !temNovoDocumentoConsignacao) {
+      return res.status(400).json({
+        message: 'Envie o termo de consignação em folha (PDF) para solicitar a aprovação.'
+      });
+    }
+
+    if (voluntariadoSolicitado && !cruzadoExistente.documentoVoluntario && !temNovoDocumentoVoluntario) {
+      return res.status(400).json({
+        message: 'Envie o termo de voluntariado (PDF) para solicitar a aprovação.'
+      });
+    }
 
     if (req.files && req.files.foto && req.files.foto[0]) {
       const bucket = getGridFSBucket();
@@ -936,16 +1043,38 @@ router.put('/atualizar/:id', upload, verifyEditToken, async (req, res) => {
       novoDocumentoConsignacaoId = uploadStream.id;
     }
 
+    if (req.files && req.files.documentoVoluntario && req.files.documentoVoluntario[0]) {
+      const bucket = getGridFSBucket();
+      const uploadStream = bucket.openUploadStream(req.files.documentoVoluntario[0].originalname, {
+        contentType: req.files.documentoVoluntario[0].mimetype
+      });
+      uploadStream.end(req.files.documentoVoluntario[0].buffer);
+      novoDocumentoVoluntarioId = uploadStream.id;
+    }
+
     // Preparar dados para atualização (não alterar certificadoIndicacao)
     const dadosAtualizacao = {
       ...req.body,
       foto: novaFotoId,
       certificadoIndicacao: novocertificadoId,
+      documentoVoluntario: novoDocumentoVoluntarioId,
       updatedAt: Date.now()
     };
 
     if (novoDocumentoConsignacaoId) {
       dadosAtualizacao.documentoConsignacao = novoDocumentoConsignacaoId;
+    }
+
+    if (!consignacaoSolicitada) {
+      dadosAtualizacao.statusConsignacao = 'nao_solicitada';
+    } else if (temNovoDocumentoConsignacao) {
+      dadosAtualizacao.statusConsignacao = 'pendente';
+    }
+
+    if (!voluntariadoSolicitado) {
+      dadosAtualizacao.statusVoluntariado = 'nao_solicitado';
+    } else if (temNovoDocumentoVoluntario) {
+      dadosAtualizacao.statusVoluntariado = 'pendente';
     }
     
     // Remover certificadoIndicacao se vier vazio/inválido (manter o original)

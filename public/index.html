@@ -80,6 +80,7 @@
 
             <label for="foto">Foto:</label>
       <input type="file" id="foto" name="foto" accept="image/*">
+          <img id="fotoPreview" alt="Pré-visualização da foto" style="display: none; width: 160px; height: 200px; object-fit: cover; margin-top: 10px; border-radius: 8px; border: 1px solid #ccc;">
 
       <h2>Informações Profissionais</h2>
 
@@ -188,6 +189,16 @@
 
         <label for="documentoVoluntario">Enviar Termo de Adesão assinado (PDF):</label>
         <input type="file" id="documentoVoluntario" name="documentoVoluntario" accept="application/pdf">
+      </div>
+
+      <div style="margin: 24px 0 16px; padding: 14px; border: 1px solid #d1d5db; border-radius: 6px; line-height: 1.5;">
+        <p style="margin: 0 0 12px;">
+          Ao preencher este formulário, autorizo a Cruzada dos Militares Espíritas (CME) a coletar, armazenar e tratar meus dados pessoais com a finalidade de realizar meu cadastro como Cruzado. Esses dados serão utilizados exclusivamente para fins institucionais, estatísticos e de comunicação interna da CME. Compreendo que meus dados não serão comercializados e que posso, a qualquer momento, solicitar a atualização, correção ou exclusão deles do banco de dados, bem como revogar este consentimento, enviando um e-mail para secretaria@cme.org.br, conforme a Lei Geral de Proteção de Dados (Lei nº 13.709/2018).
+        </p>
+        <label for="consentimento" style="display: flex; gap: 8px; align-items: flex-start; cursor: pointer;">
+          <input type="checkbox" id="consentimento" name="consentimento" value="true" required style="margin-top: 4px;">
+          <span>Li e concordo com o tratamento dos meus dados pessoais.</span>
+        </label>
       </div>
 
       <button type="submit">Enviar</button>
