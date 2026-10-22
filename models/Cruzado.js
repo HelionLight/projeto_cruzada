@@ -86,5 +86,10 @@ cruzadoSchema.index(
   { unique: true, partialFilterExpression: { cpf: { $type: 'string', $gt: '' } } }
 );
 
-module.exports = mongoose.model('Cruzado', cruzadoSchema);
+// E-mail deve ser único quando informado, mas vários legados podem não ter e-mail.
+cruzadoSchema.index(
+  { email: 1 },
+  { unique: true, partialFilterExpression: { email: { $type: 'string', $gt: '' } } }
+);
 
+module.exports = mongoose.model('Cruzado', cruzadoSchema);

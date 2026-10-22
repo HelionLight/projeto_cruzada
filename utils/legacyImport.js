@@ -182,9 +182,19 @@ const createSummary = () => ({
 
 const resolveModel = (target) => (target === 'permanent' ? Cruzado : CruzadoTemp);
 
-// Remove undefined (o Mongo ignora undefined), mantém null para campos ausentes
+// Remove undefined (o Mongo ignora undefined), mantém null para documentos novos.
 const stripUndefined = (value) => Object.fromEntries(
   Object.entries(value).filter(([, entry]) => entry !== undefined)
+);
+
+// Em atualizações, valores ausentes na planilha não devem apagar dados existentes.
+// False e 0 são valores válidos e, por isso, não podem ser tratados como vazios.
+const stripEmptyForUpdate = (value) => Object.fromEntries(
+  Object.entries(value).filter(([, entry]) => (
+    entry !== undefined &&
+    entry !== null &&
+    !(typeof entry === 'string' && entry.trim() === '')
+  ))
 );
 
 const importRows = async (rows, options = {}) => {
@@ -226,15 +236,13 @@ const importRows = async (rows, options = {}) => {
       }
 
       if (existing) {
-        const updatePayload = stripUndefined({
+        const updatePayload = stripEmptyForUpdate({
           ...document,
           _id: undefined,
           rowNumber: undefined,
-          cpf: document.cpf || existing.cpf || null,
-          numeroCruzado: document.numeroCruzado || existing.numeroCruzado || null,
+          createdAt: undefined,
           updatedAt: new Date(),
-          status: target === 'permanent' ? 'aprovado' : 'pendente',
-          createdAt: existing.createdAt || document.createdAt
+          status: target === 'permanent' ? 'aprovado' : 'pendente'
         });
 
         await Model.updateOne(
@@ -326,4 +334,3 @@ module.exports = {
   importFromFile,
   printSummary,
 };
-

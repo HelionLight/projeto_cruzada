@@ -2,16 +2,18 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const XLSX = require('xlsx');
 const QRCode = require('qrcode');
 const Cruzado = require('../models/Cruzado');
+const User = require('../models/User');
 const CruzadoTemp = require('../models/CruzadoTemp');
 const { authenticate, authorize } = require('../middleware/auth');
 const verifyEditToken = require('../middleware/verifyEditToken');
 const Joi = require('joi');
 const CruzadoCounter = require('../models/CruzadoCounter');
 const { importFromBuffer } = require('../utils/legacyImport');
-const { sendEmail, getEmailTransporter, enviarAlertaSecretario } = require('../utils/emailService');
+const { sendEmail, enviarAlertaSecretario } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -37,7 +39,23 @@ const getGridFSBucket = () => {
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB por arquivo
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB por arquivo
+  fileFilter: (req, file, callback) => {
+    const isPhoto = file.fieldname === 'foto';
+    const allowed = isPhoto
+      ? /^image\/(png|jpe?g|gif|webp|bmp|avif)$/i.test(file.mimetype)
+      : file.mimetype === 'application/pdf';
+
+    if (!allowed) {
+      return callback(new Error(
+        isPhoto
+          ? 'A foto deve ser um arquivo de imagem (PNG, JPG, JPEG, GIF, WEBP, BMP ou AVIF).'
+          : 'Este documento deve ser um arquivo PDF.'
+      ));
+    }
+
+    callback(null, true);
+  }
 }).fields([
   { name: 'foto', maxCount: 1 },
   { name: 'certificadoIndicacao', maxCount: 1 },
@@ -45,10 +63,45 @@ const upload = multer({
   { name: 'documentoConsignacao', maxCount: 1 }
 ]);
 
+const handleUpload = (req, res, next) => {
+  upload(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({
+        message: error.code === 'LIMIT_FILE_SIZE'
+          ? 'Cada arquivo pode ter no máximo 10 MB.'
+          : error.message || 'Arquivo inválido.'
+      });
+    }
+    next();
+  });
+};
+
 const uploadExcel = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 }
 }).single('arquivo');
+
+const validateUploadedContent = (files) => {
+  const allFiles = Object.values(files || {}).flat();
+  for (const file of allFiles) {
+    const isPdf = file.fieldname !== 'foto';
+    const isValidPdf = file.buffer.subarray(0, 5).toString() === '%PDF-';
+    const isValidImage = file.buffer.length >= 3 && (
+      file.buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ||
+      file.buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ||
+      file.buffer.subarray(0, 6).toString() === 'GIF87a' ||
+      file.buffer.subarray(0, 6).toString() === 'GIF89a' ||
+      file.buffer.subarray(0, 4).toString() === 'RIFF'
+    );
+
+    if ((isPdf && !isValidPdf) || (!isPdf && !isValidImage)) {
+      return isPdf
+        ? 'O documento enviado não é um PDF válido.'
+        : 'A foto enviada não é uma imagem válida.';
+    }
+  }
+  return null;
+};
 
 // Validação do formulário
 const cruzadoSchema = Joi.object({
@@ -114,8 +167,11 @@ const buildCpfRegex = (cpfDigits) => {
 };
 
 // Submeter formulário
-router.post('/register', upload, async (req, res) => {
+router.post('/register', handleUpload, async (req, res) => {
   try {
+    const uploadError = validateUploadedContent(req.files);
+    if (uploadError) return res.status(400).json({ message: uploadError });
+
     // Sanitizar e normalizar campos recebidos (remover strings vazias, converter booleanos/números)
     const sanitize = (body) => {
       Object.keys(body).forEach((key) => {
@@ -311,12 +367,15 @@ router.get('/pending/voluntarios', authenticate, authorize('admin', 'secretario'
 
 
 router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async (req, res) => {
-  const { status, processo } = req.body;
+  const { status, processo, motivo } = req.body;
 
   if (!status || !['aprovado', 'rejeitado'].includes(status)) {
     return res.status(400).json({
       message: 'Status inválido! Use "aprovado" ou "rejeitado".'
     });
+  }
+  if (!processo && status === 'rejeitado' && (!motivo || !String(motivo).trim())) {
+    return res.status(400).json({ message: 'Informe o motivo da rejeição.' });
   }
 
   try {
@@ -543,14 +602,14 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
     // ==========================================
     if (status === 'rejeitado') {
       try {
-        const transporter = getEmailTransporter();
-
-        if (transporter) {
+        if (tempCruzado.email) {
           const assuntoCandidato = 'Cadastro recusado - Cruzada';
+          const motivoRejeicao = String(motivo).trim();
 
           const textoCandidato =
             `Olá, ${tempCruzado.nome}!\n\n` +
             `Seu cadastro foi RECUSADO pela administração.\n\n` +
+            `Motivo: ${motivoRejeicao}\n\n` +
             `Obrigado.`;
 
           const htmlCandidato = `
@@ -558,12 +617,12 @@ router.put('/:id/status', authenticate, authorize('admin', 'secretario'), async 
               <h3>Cadastro recusado</h3>
               <p>Olá, <strong>${tempCruzado.nome}</strong>!</p>
               <p>Seu cadastro foi <strong>RECUSADO</strong> pela administração.</p>
+              <p><strong>Motivo:</strong> ${motivoRejeicao.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
               <p>Obrigado.</p>
             </div>
           `;
 
-          await transporter.sendMail({
-            from: process.env.GMAIL_USER,
+          await sendEmail({
             to: tempCruzado.email,
             subject: assuntoCandidato,
             text: textoCandidato,
@@ -636,7 +695,7 @@ router.delete('/:numeroCruzado', authenticate, authorize('admin'), async (req, r
   }
 });
 
-// Servir imagem do GridFS
+// Servir foto pública da carteirinha; documentos exigem autenticação.
 router.get('/image/:id', async (req, res) => {
   try {
     if (!req.params.id || req.params.id.length !== 24) {
@@ -644,6 +703,13 @@ router.get('/image/:id', async (req, res) => {
     }
 
     const bucket = getGridFSBucket();
+    const files = await bucket.find({ _id: new mongoose.Types.ObjectId(req.params.id) }).toArray();
+    const file = files[0];
+    if (!file) return res.status(404).json({ message: 'Arquivo não encontrado!' });
+    if (!String(file.contentType || '').toLowerCase().startsWith('image/')) {
+      return res.status(403).json({ message: 'Acesso ao documento não autorizado.' });
+    }
+
     const downloadStream = bucket.openDownloadStream(new mongoose.Types.ObjectId(req.params.id));
 
     downloadStream.on('error', (err) => {
@@ -655,6 +721,51 @@ router.get('/image/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao servir arquivo:', err);
     res.status(500).json({ message: 'Erro ao recuperar arquivo. Tente novamente.' });
+  }
+});
+
+// Servir documentos somente para administradores ou para o titular autenticado.
+router.get('/document/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'ID de arquivo inválido!' });
+    }
+
+    const authorization = req.header('Authorization') || '';
+    const token = authorization.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length)
+      : null;
+    if (!token) return res.status(401).json({ message: 'Autenticação necessária.' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.scope !== 'edit') {
+      const user = await User.findById(decoded.id).select('role');
+      if (!user || !['admin', 'secretario'].includes(user.role)) {
+        return res.status(403).json({ message: 'Acesso não autorizado.' });
+      }
+    } else {
+      const ownsFile = await Cruzado.exists({
+        _id: decoded.cruzadoId,
+        $or: [
+          { certificadoIndicacao: req.params.id },
+          { documentoVoluntario: req.params.id },
+          { documentoConsignacao: req.params.id }
+        ]
+      });
+      if (!ownsFile) return res.status(403).json({ message: 'Arquivo não pertence ao cadastro.' });
+    }
+
+    const bucket = getGridFSBucket();
+    const fileId = new mongoose.Types.ObjectId(req.params.id);
+    const files = await bucket.find({ _id: fileId }).toArray();
+    if (!files[0]) return res.status(404).json({ message: 'Arquivo não encontrado!' });
+
+    res.setHeader('Content-Type', files[0].contentType || 'application/pdf');
+    bucket.openDownloadStream(fileId).on('error', () => {
+      if (!res.headersSent) res.status(404).json({ message: 'Arquivo não encontrado!' });
+    }).pipe(res);
+  } catch (err) {
+    return res.status(401).json({ message: 'Token inválido ou acesso não autorizado.' });
   }
 });
 
@@ -679,13 +790,6 @@ router.get('/carteirinha/:numeroCruzado', async (req, res) => {
     res.json({
       nome: cruzado.nome,
       numeroCruzado: cruzado.numeroCruzado,
-      cpf: cruzado.cpf,
-      vinculoProfissional: cruzado.vinculoProfissional,
-      nucleoOuGede: cruzado.nucleoOuGede,
-      dataNascimento: cruzado.dataNascimento,
-      dataAprovacao: cruzado.dataAprovacao || cruzado.updatedAt || cruzado.createdAt,
-      email: cruzado.email,
-      status: cruzado.status,
       qrCodeDataUrl,
       fotoUrl
     });
@@ -881,7 +985,7 @@ router.post('/import/excel', authenticate, authorize('admin', 'secretario'), (re
   });
 });
 
-// Buscar Cruzado por CPF ou número de cruzado (para edição)
+// Buscar apenas os dados necessários para iniciar a verificação de identidade.
 router.get('/buscar', async (req, res) => {
   try {
     const cpfQuery = req.query.cpf;
@@ -894,7 +998,14 @@ router.get('/buscar', async (req, res) => {
     // 1) Buscar por numeroCruzado (chave principal dos registros legados)
     if (numeroCruzadoQuery) {
       const cruzadoPorNumero = await Cruzado.findOne({ numeroCruzado: numeroCruzadoQuery });
-      if (cruzadoPorNumero) return res.json(cruzadoPorNumero);
+      if (cruzadoPorNumero) {
+        return res.json({
+          _id: cruzadoPorNumero._id,
+          nome: cruzadoPorNumero.nome,
+          numeroCruzado: cruzadoPorNumero.numeroCruzado,
+          possuiEmail: Boolean(cruzadoPorNumero.email)
+        });
+      }
     }
 
     if (!cpfQuery) {
@@ -903,19 +1014,40 @@ router.get('/buscar', async (req, res) => {
 
     // 2) Tentar busca EXATA pelo valor salvo (útil se o banco guarda CPF formatado)
     let cruzado = await Cruzado.findOne({ cpf: cpfQuery });
-    if (cruzado) return res.json(cruzado);
+    if (cruzado) {
+      return res.json({
+        _id: cruzado._id,
+        nome: cruzado.nome,
+        numeroCruzado: cruzado.numeroCruzado,
+        possuiEmail: Boolean(cruzado.email)
+      });
+    }
 
     // 3) Tentar buscar por versão sem formatação (somente dígitos)
     const cpfLimpo = cpfQuery.replace(/\D/g, '');
     if (cpfLimpo && cpfLimpo.length === 11) {
       cruzado = await Cruzado.findOne({ cpf: cpfLimpo });
-      if (cruzado) return res.json(cruzado);
+      if (cruzado) {
+        return res.json({
+          _id: cruzado._id,
+          nome: cruzado.nome,
+          numeroCruzado: cruzado.numeroCruzado,
+          possuiEmail: Boolean(cruzado.email)
+        });
+      }
     }
 
     // 4) Fallback mais robusto: comparar CPF usando regex compatível
     try {
       cruzado = await Cruzado.findOne({ cpf: buildCpfRegex(cpfLimpo) });
-      if (cruzado) return res.json(cruzado);
+      if (cruzado) {
+        return res.json({
+          _id: cruzado._id,
+          nome: cruzado.nome,
+          numeroCruzado: cruzado.numeroCruzado,
+          possuiEmail: Boolean(cruzado.email)
+        });
+      }
     } catch (e) {
       // Ignorar; já tentamos os casos exatos e sem formatação
     }
@@ -927,9 +1059,19 @@ router.get('/buscar', async (req, res) => {
   }
 });
 
+// Retorna dados completos somente após a validação do token de edição.
+router.get('/editar/:id', verifyEditToken, async (req, res) => {
+  const cruzado = await Cruzado.findById(req.params.id);
+  if (!cruzado) return res.status(404).json({ message: 'Cadastro não encontrado!' });
+  res.json(cruzado);
+});
+
 // Atualizar Cruzado por ID (para edição do usuário)
-router.put('/atualizar/:id', upload, verifyEditToken, async (req, res) => {
+router.put('/atualizar/:id', handleUpload, verifyEditToken, async (req, res) => {
   try {
+    const uploadError = validateUploadedContent(req.files);
+    if (uploadError) return res.status(400).json({ message: uploadError });
+
     const cruzadoId = req.params.id;
 
     if (!mongoose.Types.ObjectId.isValid(cruzadoId)) {

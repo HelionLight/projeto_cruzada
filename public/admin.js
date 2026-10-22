@@ -2,6 +2,27 @@
 let token = '';
 let pendingRefreshTimer = null;
 
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+async function openProtectedFile(fileId) {
+  try {
+    const response = await fetch(`/api/cruzados/document/${encodeURIComponent(fileId)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Não foi possível abrir o arquivo.');
+    const blobUrl = URL.createObjectURL(await response.blob());
+    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  } catch (error) {
+    alert(`❌ ${error.message}`);
+  }
+}
+
 function refreshPendingLists() {
   loadPending();
   loadPendingVoluntarios();
@@ -29,6 +50,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (importBtn) {
     importBtn.addEventListener('click', importarPlanilhaExcel);
   }
+
+  const adminEditBtn = document.getElementById('adminEditBtn');
+  if (adminEditBtn) {
+    adminEditBtn.addEventListener('click', () => {
+      sessionStorage.setItem('adminAuthToken', token);
+      window.location.href = '/admin-editar.html';
+    });
+  }
 });
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -50,6 +79,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     const result = await response.json();
     if (response.ok) {
       token = result.token;
+      sessionStorage.setItem('adminAuthToken', token);
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('adminPanel').style.display = 'block';
       refreshPendingLists();
@@ -91,14 +121,14 @@ async function loadPending() {
       const certificadoUrl = cruzado.certificadoIndicacao ? `/api/cruzados/image/${cruzado.certificadoIndicacao}` : null;
       
       row.innerHTML = `
-        <td>${cruzado.nome}</td>
-        <td>${cruzado.email}</td>
-        <td>${cruzado.cpf}</td>
+        <td>${escapeHtml(cruzado.nome)}</td>
+        <td>${escapeHtml(cruzado.email)}</td>
+        <td>${escapeHtml(cruzado.cpf)}</td>
         <td>
           ${fotoUrl ? `<a href="${fotoUrl}" target="_blank"><button class="btnView">Ver Foto</button></a>` : 'Sem foto'}
         </td>
         <td>
-          ${certificadoUrl ? `<a href="${certificadoUrl}" target="_blank"><button class="btnView">Ver PDF</button></a>` : 'Sem PDF'}
+          ${cruzado.certificadoIndicacao ? `<button class="btnView" onclick="openProtectedFile('${cruzado.certificadoIndicacao}')">Ver PDF</button>` : 'Sem PDF'}
         </td>
         <td>
           <button class="btnApprove" onclick="approve('${cruzado._id}')">Aprovar</button>
@@ -117,10 +147,15 @@ async function approve(id) {
 }
 
 async function reject(id) {
-  await updateStatus(id, 'rejeitado');
+  const motivo = window.prompt('Informe o motivo da rejeição:');
+  if (!motivo || !motivo.trim()) {
+    alert('É necessário informar o motivo da rejeição.');
+    return;
+  }
+  await updateStatus(id, 'rejeitado', motivo.trim());
 }
 
-async function updateStatus(id, status) {
+async function updateStatus(id, status, motivo = '') {
   try {
     const response = await fetch(`/api/cruzados/${id}/status`, {
       method: 'PUT',
@@ -128,7 +163,7 @@ async function updateStatus(id, status) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status, ...(motivo ? { motivo } : {}) })
     });
 
     if (response.ok) {
@@ -265,9 +300,9 @@ async function loadPendingVoluntarios() {
         : null;
 
       row.innerHTML = `
-        <td>${voluntario.nome}</td>
-        <td>${voluntario.email}</td>
-        <td>${voluntario.numeroCruzado || '-'}</td>
+        <td>${escapeHtml(voluntario.nome)}</td>
+        <td>${escapeHtml(voluntario.email)}</td>
+        <td>${escapeHtml(voluntario.numeroCruzado || '-')}</td>
         <td>
           ${fotoUrl
             ? `<a href="${fotoUrl}" target="_blank"><button class="btnView">Ver Foto</button></a>`
@@ -275,7 +310,7 @@ async function loadPendingVoluntarios() {
         </td>
         <td>
           ${documentoUrl
-            ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Ver Termo</button></a>`
+            ? `<button class="btnView" onclick="openProtectedFile('${voluntario.documentoVoluntario}')">Ver Termo</button>`
             : 'Sem termo'}
         </td>
         <td>
@@ -328,12 +363,12 @@ async function loadPendingConsignacao() {
         : null;
 
       row.innerHTML = `
-        <td>${registro.nome}</td>
-        <td>${registro.email}</td>
-        <td>${registro.numeroCruzado || '-'}</td>
+        <td>${escapeHtml(registro.nome)}</td>
+        <td>${escapeHtml(registro.email)}</td>
+        <td>${escapeHtml(registro.numeroCruzado || '-')}</td>
         <td>
           ${documentoUrl
-            ? `<a href="${documentoUrl}" target="_blank"><button class="btnView">Baixar PDF</button></a>`
+            ? `<button class="btnView" onclick="openProtectedFile('${registro.documentoConsignacao}')">Baixar PDF</button>`
             : 'Sem PDF'}
         </td>
         <td>

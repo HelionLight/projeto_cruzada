@@ -180,7 +180,7 @@
       <div class="logo"><img id="logoImg" src="/logo_cruzada.jpeg" alt="Logo Cruzada"></div>
       <div class="top-text">
         <h1>CRUZADA DOS MILITARES ESPÍRITAS</h1>
-        <p id="topInfo">cme.org.br · e-mail: —</p>
+        <p id="topInfo">cme.org.br</p>
       </div>
     </div>
 
@@ -192,7 +192,6 @@
       <div class="info-box">
         <div class="info-line large"><strong>Cruzado Nr:</strong><span id="numeroCruzado">—</span></div>
         <div class="info-line large"><strong>Nome:</strong><span id="nomeCruzado">—</span></div>
-        <div class="info-line large"><strong>Registro em</strong><span id="registroData">—</span></div>
       </div>
 
       <div class="qr-box">
@@ -212,17 +211,7 @@
     const qrCode = document.getElementById('qrCode');
     const nomeCruzado = document.getElementById('nomeCruzado');
     const numeroCruzadoEl = document.getElementById('numeroCruzado');
-    const registroData = document.getElementById('registroData');
     const card = document.querySelector('.card');
-
-    const formatDate = (dateString) => {
-      if (!dateString) return '-';
-      const date = new Date(dateString);
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = String(date.getFullYear()).slice(-2);
-      return `${day} / ${month} / ${year}`;
-    };
 
     const renderError = (message) => {
       card.innerHTML = `<div class="error">${message}</div>`;
@@ -245,10 +234,6 @@
           qrCode.src = data.qrCodeDataUrl || '';
           nomeCruzado.textContent = data.nome || '-';
           numeroCruzadoEl.textContent = data.numeroCruzado || '-';
-          registroData.textContent = formatDate(data.dataAprovacao);
-          // Atualizar top info para mostrar email do titular (sem https)
-          const topInfo = document.getElementById('topInfo');
-          if (topInfo) topInfo.textContent = `cme.org.br · e-mail: ${data.email || '-'}`;
         })
         .catch((err) => renderError(err.message));
     }

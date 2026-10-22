@@ -15,7 +15,7 @@ const verifyEditToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded || decoded.scope !== 'edit') {
+    if (!decoded || !['edit', 'admin-edit'].includes(decoded.scope)) {
       return res.status(403).json({ message: 'Token inválido ou sem permissão de edição.' });
     }
 

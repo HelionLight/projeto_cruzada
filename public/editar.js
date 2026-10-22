@@ -31,6 +31,30 @@ let cruzadoOriginal = null;
 let editToken = null;
 let numeroCruzadoBusca = '';
 
+async function carregarDadosEditaveis() {
+  const response = await fetch(`/api/cruzados/editar/${cruzadoId}`, {
+    headers: { Authorization: `Bearer ${editToken}` }
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Não foi possível carregar o cadastro.');
+  cruzadoOriginal = JSON.parse(JSON.stringify(data));
+  preencherFormulario(data);
+  mostrarLinkCarteirinha(data);
+}
+
+async function openEditDocument(fileId) {
+  const response = await fetch(`/api/cruzados/document/${encodeURIComponent(fileId)}`, {
+    headers: { Authorization: `Bearer ${editToken}` }
+  });
+  if (!response.ok) {
+    alert('Não foi possível abrir o documento.');
+    return;
+  }
+  const blobUrl = URL.createObjectURL(await response.blob());
+  window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+}
+
 function mostrarLinkCarteirinha(cruzado) {
   const container = document.getElementById('carteirinhaLinkContainer');
   const link = document.getElementById('carteirinhaLink');
@@ -89,7 +113,7 @@ function mostrarEtapaCodigo() {
   if (buscaFormEl) buscaFormEl.style.display = 'block';
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const buscarBtn = document.getElementById('buscarBtn');
   const cancelarBtn = document.getElementById('cancelarBtn');
   const cpfBuscaInput = document.getElementById('cpfBusca');
@@ -256,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
       editToken = data.token;
       setStatusCodigo('✅ Código validado. Você já pode editar e salvar.');
       habilitarEdicao(true);
-      mostrarLinkCarteirinha(cruzadoOriginal);
+      await carregarDadosEditaveis();
       const edicaoForm = document.getElementById('edicaoForm');
       if (edicaoForm) edicaoForm.style.display = 'block';
     } catch (e) {
@@ -306,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
       editToken = data.token;
       if (statusSemEmail) statusSemEmail.textContent = '✅ Identidade validada. Você já pode editar e salvar.';
       habilitarEdicao(true);
-      mostrarLinkCarteirinha(cruzadoOriginal);
+      await carregarDadosEditaveis();
       const edicaoForm = document.getElementById('edicaoForm');
       if (edicaoForm) edicaoForm.style.display = 'block';
     } catch (e) {
@@ -318,6 +342,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // inicialmente, edição desabilitada até validar código
   habilitarEdicao(false);
+
+  const adminEditToken = sessionStorage.getItem('adminEditToken');
+  const adminEditCruzadoId = sessionStorage.getItem('adminEditCruzadoId');
+  if (adminEditToken && adminEditCruzadoId) {
+    try {
+      editToken = adminEditToken;
+      cruzadoId = adminEditCruzadoId;
+      await carregarDadosEditaveis();
+      habilitarEdicao(true);
+      document.getElementById('buscaForm').style.display = 'none';
+      document.getElementById('edicaoForm').style.display = 'block';
+      mostrarSemEmailForm(false);
+      mostrarCodigoForm(false);
+      sessionStorage.removeItem('adminEditToken');
+      sessionStorage.removeItem('adminEditCruzadoId');
+    } catch (error) {
+      editToken = null;
+      cruzadoId = null;
+      alert(`❌ Não foi possível carregar o cadastro: ${error.message}`);
+    }
+  }
 
   if (solicitarCodigoBtn) solicitarCodigoBtn.addEventListener('click', solicitarCodigo);
   if (verificarCodigoBtn) verificarCodigoBtn.addEventListener('click', verificarCodigo);
@@ -527,11 +572,8 @@ async function executarBusca(url) {
   cruzadoId = cruzado._id;
   cruzadoOriginal = JSON.parse(JSON.stringify(cruzado));
 
-  // Preencher formulário
-  preencherFormulario(cruzado);
-
   // Se não tiver e-mail, mostrar fluxo alternativo (nome + número)
-  if (!cruzado.email) {
+  if (!cruzado.possuiEmail) {
     mostrarSemEmailForm(true);
     mostrarCodigoForm(false);
     const numeroSemEmail = document.getElementById('numeroSemEmail');
@@ -593,14 +635,22 @@ document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
     document.getElementById('documentoVoluntarioInfo').textContent = '📄 Termo já existente (deixe em branco para não alterar)';
     const documentoVoluntarioAtual = document.getElementById('documentoVoluntarioAtual');
     if (documentoVoluntarioAtual) {
-      documentoVoluntarioAtual.href = `/api/cruzados/image/${cruzado.documentoVoluntario}`;
+      documentoVoluntarioAtual.href = '#';
+      documentoVoluntarioAtual.onclick = (event) => {
+        event.preventDefault();
+        openEditDocument(cruzado.documentoVoluntario);
+      };
       documentoVoluntarioAtual.style.display = 'inline-block';
     }
   }
   if (cruzado.documentoConsignacao) {
     const documentoConsignacaoAtual = document.getElementById('documentoConsignacaoAtual');
     if (documentoConsignacaoAtual) {
-      documentoConsignacaoAtual.href = `/api/cruzados/image/${cruzado.documentoConsignacao}`;
+      documentoConsignacaoAtual.href = '#';
+      documentoConsignacaoAtual.onclick = (event) => {
+        event.preventDefault();
+        openEditDocument(cruzado.documentoConsignacao);
+      };
       documentoConsignacaoAtual.style.display = 'inline-block';
     }
   }

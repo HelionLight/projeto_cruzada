@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editar Cadastro - Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Editar Cadastro por CPF</h1>
+    <p>Pesquise o cadastro e solicite um código. O código será enviado ao e-mail do secretário.</p>
+
+    <label for="cpfBuscaAdmin">CPF do cadastro:</label>
+    <input type="text" id="cpfBuscaAdmin" placeholder="000.000.000-00" inputmode="numeric">
+    <button type="button" id="buscarAdminBtn">🔎 Pesquisar CPF</button>
+
+    <div id="cadastroEncontrado" style="display: none; margin-top: 18px; padding: 14px; border: 1px solid #cbd5e1; border-radius: 6px;">
+      <p><strong>Nome:</strong> <span id="nomeEncontrado"></span></p>
+      <p><strong>Número Cruzado:</strong> <span id="numeroEncontrado">Sem dados</span></p>
+      <button type="button" id="solicitarCodigoAdminBtn">📩 Enviar código ao secretário</button>
+    </div>
+
+    <div id="codigoAdminForm" style="display: none; margin-top: 18px;">
+      <label for="codigoAdmin">Código recebido pelo secretário:</label>
+      <input type="text" id="codigoAdmin" placeholder="00000000" inputmode="numeric">
+      <button type="button" id="validarCodigoAdminBtn">✅ Validar código e abrir edição</button>
+    </div>
+
+    <p id="statusAdmin" style="margin-top: 14px; color: #475569;"></p>
+    <p style="margin-top: 20px;"><a href="/admin">← Voltar ao painel</a></p>
+  </div>
+  <script src="admin-editar.js"></script>
+</body>
+</html>

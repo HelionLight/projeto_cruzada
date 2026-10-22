@@ -1,0 +1,14 @@
+problema 1 do legado não é problema a iportação legado ja foi feita, 
+problema 2 ajuste para seguir oq vc falou pq faz sentido, 
+problema 3 o mesmo do dois mas esse eu quero saber tambem é oque vc ta falando mesmo é o acesso por terminal de comandos pq no caso o ste sera colocado no render
+problema 4 me explique melhor pois não entendi
+problema 5 concordo e se não for alterar nada pode até mesmo tirar o create user inteiro ja que ele só foi feito pra criar esse dado no banco de dados e agora ja esta lá né
+problema 6 concordo adicione um limite de 3 tentativas
+problema 7 ok entendo oq diz e qero que faça para que o arquivo só possa ser na foto arquivos de imagem como png, jpg e etc e nos outros somente arquivos pdf e aumente o limite para 10 mb ao inves de 5
+problema 8 não isso ta certo tem que ser unico mesmo me fala como definir isso ou se vc pode mudar isso sozinho e se ele ser unico não vai dar problema com varios sendo null
+problema 9 isso é a pagina que o qr code da carteirinha leva pra validar se o cadastro ainda esta ativo ou não então se não for terar nada pode tirar de puxar o cpf fica mais seguro assim tambem
+problema 10 concordo e coloque somente então nome, numero de cruzado, a foto e o qr code pra pagina de verificação como ta, o resto pode tirar da carteirinha so lembre de ajustar o desing pra não ficar com uns buracos pela falta do que foi tirado
+problema 11 acho que entendi o problema e se for so o caso de não receberem o email de serem rejeitados arrume isso pois que é rejeitado tem que receber o email dizendo o porque certinho
+problema 12 ok vamos falar mais dele depois de todo resto 
+problema 13 eu testo tudo eu mesmo não precisa automatizar
+problema 14 ajustamos isso depois pois ainda vamos alterar coisas 

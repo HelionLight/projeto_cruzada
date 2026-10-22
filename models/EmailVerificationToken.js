@@ -4,10 +4,12 @@ const emailVerificationTokenSchema = new mongoose.Schema({
   cpf: { type: String, default: null },
   numeroCruzado: { type: String, default: null },
   nome: { type: String, default: null },
+  purpose: { type: String, enum: ['user_edit', 'admin_edit'], default: 'user_edit', index: true },
   cruzadoId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cruzado', default: null },
   tokenId: { type: String, required: true, unique: true, index: true },
   expiresAt: { type: Date, required: true, index: true },
-  usedAt: { type: Date, default: null }
+  usedAt: { type: Date, default: null },
+  verificationAttempts: { type: Number, default: 0 }
 });
 
 // Índice para busca por CPF
@@ -22,4 +24,3 @@ emailVerificationTokenSchema.index({ cruzadoId: 1 });
 emailVerificationTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('EmailVerificationToken', emailVerificationTokenSchema, 'email_verification_tokens');
-
