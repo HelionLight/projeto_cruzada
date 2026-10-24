@@ -738,12 +738,7 @@ router.get('/document/:id', async (req, res) => {
     if (!token) return res.status(401).json({ message: 'Autenticação necessária.' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.scope !== 'edit') {
-      const user = await User.findById(decoded.id).select('role');
-      if (!user || !['admin', 'secretario'].includes(user.role)) {
-        return res.status(403).json({ message: 'Acesso não autorizado.' });
-      }
-    } else {
+    if (decoded.scope === 'edit' || decoded.scope === 'admin-edit') {
       const ownsFile = await Cruzado.exists({
         _id: decoded.cruzadoId,
         $or: [
@@ -753,6 +748,11 @@ router.get('/document/:id', async (req, res) => {
         ]
       });
       if (!ownsFile) return res.status(403).json({ message: 'Arquivo não pertence ao cadastro.' });
+    } else {
+      const user = await User.findById(decoded.id).select('role');
+      if (!user || !['admin', 'secretario'].includes(user.role)) {
+        return res.status(403).json({ message: 'Acesso não autorizado.' });
+      }
     }
 
     const bucket = getGridFSBucket();
