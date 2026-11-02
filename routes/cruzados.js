@@ -13,7 +13,7 @@ const verifyEditToken = require('../middleware/verifyEditToken');
 const Joi = require('joi');
 const CruzadoCounter = require('../models/CruzadoCounter');
 const { importFromBuffer } = require('../utils/legacyImport');
-const { sendEmail, enviarAlertaSecretario } = require('../utils/emailService');
+const { sendEmail, enviarAlertaSecretario, enviarAlertaAtualizacaoSecretario } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -666,6 +666,7 @@ router.put('/:numeroCruzado', authenticate, authorize('admin'), async (req, res)
 
     const cruzado = await Cruzado.findOneAndUpdate({ numeroCruzado: req.params.numeroCruzado }, req.body, { new: true });
     if (!cruzado) return res.status(404).json({ message: 'Registro com número ' + req.params.numeroCruzado + ' não encontrado!' });
+    await enviarAlertaAtualizacaoSecretario(cruzado);
     res.json(cruzado);
   } catch (err) {
     console.error('Erro ao atualizar registro:', err);
@@ -1226,6 +1227,8 @@ router.put('/atualizar/:id', handleUpload, verifyEditToken, async (req, res) => 
 
     // Atualizar Cruzado
     const cruzadoAtualizado = await Cruzado.findByIdAndUpdate(cruzadoId, dadosAtualizacao, { new: true });
+
+    await enviarAlertaAtualizacaoSecretario(cruzadoAtualizado);
 
     res.json({ message: 'Cadastro atualizado com sucesso!', cruzado: cruzadoAtualizado });
   } catch (err) {

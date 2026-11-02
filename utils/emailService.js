@@ -102,4 +102,38 @@ const enviarAlertaSecretario = async (qtdPendentes = 0) => {
   }
 };
 
-module.exports = { getEmailTransporter, sendEmail, enviarAlertaSecretario };
+const enviarAlertaAtualizacaoSecretario = async (cruzado) => {
+  const enabled = String(process.env.EMAIL_ALERT_ENABLED || 'true').toLowerCase() !== 'false';
+  if (!enabled) return;
+
+  const destinatario = process.env.SECRETARIO_EMAIL || process.env.GMAIL_USER || 'secretaria@cme.org.br';
+
+  try {
+    const nome = cruzado?.nome || 'Sem nome';
+    const cpf = cruzado?.cpf || 'Sem CPF';
+    const numero = cruzado?.numeroCruzado || 'Sem número';
+    const assunto = `Cadastro atualizado - ${nome}`;
+    const texto = `Olá, secretário(a)!\n\nO cadastro de ${nome} foi atualizado.\nCPF: ${cpf}\nNúmero Cruzado: ${numero}\n\nAcesse o painel administrativo para conferir as alterações.`;
+    const html = `
+      <div style="font-family: Arial, sans-serif;">
+        <h2>Cadastro atualizado</h2>
+        <p>O cadastro de <strong>${nome}</strong> foi atualizado.</p>
+        <p><strong>CPF:</strong> ${cpf}</p>
+        <p><strong>Número Cruzado:</strong> ${numero}</p>
+        <p>Acesse o painel administrativo para conferir as alterações.</p>
+      </div>
+    `;
+
+    await sendEmail({ to: destinatario, subject: assunto, text: texto, html });
+    console.log(`Alerta de atualização enviado para ${destinatario}`);
+  } catch (err) {
+    console.error('Erro ao enviar alerta de atualização:', err);
+  }
+};
+
+module.exports = {
+  getEmailTransporter,
+  sendEmail,
+  enviarAlertaSecretario,
+  enviarAlertaAtualizacaoSecretario
+};

@@ -13,14 +13,16 @@ function formatarCPF(cpf) {
   }
 }
 
-// Formatação de Celular
+// Formatação de telefone com DDD.
 function formatarCelular(celular) {
   if (!celular) return '';
   const celularLimpo = String(celular).replace(/\D/g, '');
   if (celularLimpo.length <= 2) {
     return '(' + celularLimpo;
-  } else if (celularLimpo.length <= 7) {
+  } else if (celularLimpo.length <= 6) {
     return '(' + celularLimpo.slice(0, 2) + ') ' + celularLimpo.slice(2);
+  } else if (celularLimpo.length <= 10) {
+    return '(' + celularLimpo.slice(0, 2) + ') ' + celularLimpo.slice(2, 6) + '-' + celularLimpo.slice(6, 10);
   } else {
     return '(' + celularLimpo.slice(0, 2) + ') ' + celularLimpo.slice(2, 7) + '-' + celularLimpo.slice(7, 11);
   }
@@ -435,7 +437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const container = document.getElementById('especificarVinculoContainer');
       const consignacaoOpcao = document.getElementById('consignacaoOpcaoContainer');
 
-      if (vinculoSelect.value === 'Outros') {
+      if (vinculoSelect.value !== 'Civil') {
         container.style.display = 'block';
       } else {
         container.style.display = 'none';
@@ -656,7 +658,7 @@ document.getElementById('nucleoOuGede').value = cruzado.nucleoOuGede || '';
   }
 
   // Ativar campos condicionais
-  if (cruzado.vinculoProfissional === 'Outros') {
+  if (cruzado.vinculoProfissional && cruzado.vinculoProfissional !== 'Civil') {
     document.getElementById('especificarVinculoContainer').style.display = 'block';
   }
   if (cruzado.vinculoProfissional === 'Exército') {

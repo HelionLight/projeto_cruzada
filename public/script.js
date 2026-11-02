@@ -12,13 +12,15 @@ function formatarCPF(cpf) {
   }
 }
 
-// Função para formatar Celular: (XX) XXXXX-XXXX
+// Função para formatar telefone com DDD.
 function formatarCelular(celular) {
   const celularLimpo = celular.replace(/\D/g, '');
   if (celularLimpo.length <= 2) {
     return '(' + celularLimpo;
-  } else if (celularLimpo.length <= 7) {
+  } else if (celularLimpo.length <= 6) {
     return '(' + celularLimpo.slice(0, 2) + ') ' + celularLimpo.slice(2);
+  } else if (celularLimpo.length <= 10) {
+    return '(' + celularLimpo.slice(0, 2) + ') ' + celularLimpo.slice(2, 6) + '-' + celularLimpo.slice(6, 10);
   } else {
     return '(' + celularLimpo.slice(0, 2) + ') ' + celularLimpo.slice(2, 7) + '-' + celularLimpo.slice(7, 11);
   }
@@ -85,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (vinculoSelect) {
     vinculoSelect.addEventListener('change', () => {
       const container = document.getElementById('especificarVinculoContainer');
-      if (vinculoSelect.value === 'Outros') {
+      if (vinculoSelect.value !== 'Civil') {
         container.style.display = 'block';
       } else {
         container.style.display = 'none';
